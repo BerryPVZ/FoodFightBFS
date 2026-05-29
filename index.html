@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Food Fight HTML5 Remake Prototype</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; background:#071b22; font-family: "Trebuchet MS", "Comic Sans MS", system-ui, sans-serif; }
+  #wrap { height:100%; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at center,#163544 0,#06151b 72%); }
+  canvas { width:min(100vw, 177.78vh); height:min(56.25vw, 100vh); image-rendering:auto; touch-action:none; box-shadow:0 0 0 5px #021015, 0 16px 60px #000b; background:#0d2730; }
+  #hint { position:fixed; left:10px; bottom:8px; color:#e6f3c8; opacity:.7; font-size:12px; pointer-events:none; text-shadow:1px 1px 2px #000; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game" width="960" height="540" aria-label="Food Fight HTML5 game"></canvas></div>
+<div id="hint">Tip: click a food card, then a cafeteria tile. Use the shovel to remove food. Audio starts after your first click.</div>
+<script>
+(() => {
+'use strict';
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = true;
+
+const W=960,H=540;
+const grid = { x:96, y:86, cols:9, rows:5, cw:80, ch:80 };
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const rowY=r=>grid.y+r*grid.ch+grid.ch*0.5;
+const colX=c=>grid.x+c*grid.cw+grid.cw*0.5;
+
+const assetNames = [
+ 'title_foodfight.png','lunch_money.png','shovel.png','lock.png','sweeper.png','spinner.png',
+ 'jello_blob.png','gum_bubble.png','corn_kernel.png','sauce_drop.png','noodle.png','pickle.png','ice_scoop.png','pizza_slice.png','soda_bubble.png',
+ 'mint_plant.png','jello_shot.png','bubble_gum_pop.png','rice_crispy_wall.png','corn_cannon.png','noodle_lasher.png','taco_trap.png','cupcake_blaster.png','burger_bunker.png','soda_fizz.png','pickle_pult.png','pizza_disc.png','ice_cream_freeze.png','spaghetti_tangle.png','banana_peel.png','ketchup_sprayer.png','mustard_mortar.png','donut_decoy.png','melon_mortar.png','toast_turret.png','sushi_spinner.png','carrot_spikes.png','nacho_nova.png','waffle_guard.png',
+ 'geek.png','cheerleader.png','jock.png','basketball_player.png','zombie_human.png','bomb_boy.png','footballer.png','lunch_rusher.png',
+ 'salad_spinner.png','soup_slinger.png','licorice_whip.png','gravy_boat.png','cheese_wheel.png','pancake_stack.png','popcorn_popper.png','milk_carton_medic.png','funnel_cake_fan.png','frozen_pea_bag.png',
+ 'janitor.png','food_critic.png','sugar_kid.png','hungry_uncle.png','delivery_dude.png','early_bird.png','usher.png','hall_monitor.png','circus_clown.png','parka_shopper.png'
+];
+const img = {};
+let loaded=0;
+assetNames.forEach(name=>{ const im=new Image(); im.onload=()=>loaded++; im.onerror=()=>loaded++; im.src=name; img[name]=im; });
+
+const audioNames = ['music_menu.mp3','music_game.mp3','music_cafeteria.mp3','music_restaurant.mp3','music_candy.mp3','music_thanksgiving.mp3','music_pizza.mp3','music_breakfast.mp3','music_theater.mp3','music_school.mp3','music_carnival.mp3','music_freezer.mp3','sfx_shoot.mp3','sfx_coin.mp3','sfx_plant.mp3','sfx_hit.mp3','sfx_sweeper.mp3','sfx_win.mp3','sfx_lose.mp3','sfx_click.mp3'];
+const sounds = {}; audioNames.forEach(n=>{ const a=new Audio(n); a.preload='auto'; sounds[n]=a; });
+const musicNames = audioNames.filter(n=>n.startsWith('music_'));
+musicNames.forEach(n=>{ sounds[n].loop=true; sounds[n].volume=n==='music_menu.mp3'?.45:.36; });
+let audioReady=false;
+function unlockAudio(){ if(audioReady) return; audioReady=true; playMusic('menu'); }
+function sfx(n,vol=1){ if(!audioReady) return; const src=sounds[n]; if(!src) return; try{ const a=src.cloneNode(); a.volume=clamp(vol,0,1); a.play().catch(()=>{}); }catch(e){} }
+function playMusic(which){ if(!audioReady) return; const target = which==='game' ? ((game && campaignDefs[game.campaign] && campaignDefs[game.campaign].track) || 'music_game.mp3') : 'music_menu.mp3'; musicNames.forEach(n=>{ const a=sounds[n]; if(!a) return; if(n!==target){ a.pause(); try{a.currentTime=0;}catch(e){} } }); const song=sounds[target]||sounds['music_game.mp3']; if(song && song.paused) song.play().catch(()=>{}); }
+
+const weaponDefs = [
+ {id:'mint', name:'Mint Plant', img:'mint_plant.png', cost:50, cool:4.5, hp:260, unlock:1, role:'money', desc:'Grows lunch money every few seconds.'},
+ {id:'jello', name:'Jello Shot', img:'jello_shot.png', cost:100, cool:5, hp:230, dmg:24, rate:1.25, shot:'jello_blob.png', speed:310, unlock:1, desc:'Basic green blob shooter.'},
+ {id:'gum', name:'Bubble Gum POP', img:'bubble_gum_pop.png', cost:75, cool:5, hp:210, dmg:16, rate:1.9, shot:'gum_bubble.png', speed:260, effect:'slow', unlock:2, desc:'Slows hungry humans.'},
+ {id:'wall', name:'Rice Crispy Wall', img:'rice_crispy_wall.png', cost:50, cool:6, hp:920, unlock:1, role:'wall', desc:'Cheap chunky blocker.'},
+ {id:'corn', name:'Corn Cannon', img:'corn_cannon.png', cost:200, cool:8, hp:260, dmg:72, rate:2.6, shot:'corn_kernel.png', speed:340, splash:45, unlock:3, desc:'Heavy kernels with small splash.'},
+ {id:'noodle', name:'Noodle Lasher', img:'noodle_lasher.png', cost:125, cool:6, hp:235, dmg:36, rate:1.7, shot:'noodle.png', speed:330, pierce:2, unlock:3, desc:'Piercing noodle lashes.'},
+ {id:'taco', name:'Taco Trap', img:'taco_trap.png', cost:150, cool:8, hp:110, role:'trap', dmg:190, unlock:4, desc:'One big chomp when stepped on.'},
+ {id:'cupcake', name:'Cupcake Blaster', img:'cupcake_blaster.png', cost:150, cool:7, hp:230, dmg:22, rate:.72, shot:'jello_blob.png', speed:280, multi:2, unlock:4, desc:'Fast double frosting shots.'},
+ {id:'burger', name:'Burger Bunker', img:'burger_bunker.png', cost:125, cool:7, hp:1350, unlock:5, role:'wall', desc:'A massive blocker.'},
+ {id:'soda', name:'Soda Fizz', img:'soda_fizz.png', cost:175, cool:7, hp:220, dmg:18, rate:1.2, shot:'soda_bubble.png', speed:300, effect:'stun', unlock:5, desc:'Fizzy stun shots.'},
+ {id:'pickle', name:'Pickle Pult', img:'pickle_pult.png', cost:175, cool:8, hp:230, dmg:48, rate:2.1, shot:'pickle.png', speed:240, lob:true, unlock:6, desc:'Arcing pickles over blockers.'},
+ {id:'pizza', name:'Pizza Disc', img:'pizza_disc.png', cost:200, cool:8, hp:240, dmg:38, rate:1.6, shot:'pizza_slice.png', speed:360, pierce:3, unlock:6, desc:'Slices through a line.'},
+ {id:'icecream', name:'Ice Cream Freeze', img:'ice_cream_freeze.png', cost:175, cool:8, hp:220, dmg:15, rate:2.2, shot:'ice_scoop.png', speed:260, effect:'freeze', unlock:7, desc:'Freezes a target briefly.'},
+ {id:'spaghetti', name:'Spaghetti Tangle', img:'spaghetti_tangle.png', cost:125, cool:7, hp:235, dmg:12, rate:1.4, shot:'noodle.png', speed:280, effect:'slow2', unlock:7, desc:'Keeps crowds tangled.'},
+ {id:'banana', name:'Banana Peel', img:'banana_peel.png', cost:50, cool:5, hp:80, role:'trap', dmg:45, effect:'slip', unlock:8, desc:'Trips and stuns one enemy.'},
+ {id:'ketchup', name:'Ketchup Sprayer', img:'ketchup_sprayer.png', cost:125, cool:6, hp:220, dmg:18, rate:1.0, shot:'sauce_drop.png', speed:320, effect:'bleed', unlock:8, desc:'Sauce damage over time.'},
+ {id:'mustard', name:'Mustard Mortar', img:'mustard_mortar.png', cost:225, cool:9, hp:220, dmg:95, rate:3.1, shot:'corn_kernel.png', speed:260, splash:80, unlock:9, desc:'Big splash mortar.'},
+ {id:'donut', name:'Donut Decoy', img:'donut_decoy.png', cost:75, cool:8, hp:700, role:'wall', lure:true, unlock:9, desc:'Distracts enemies longer.'},
+ {id:'melon', name:'Melon Mortar', img:'melon_mortar.png', cost:300, cool:10, hp:250, dmg:115, rate:3.5, shot:'pickle.png', speed:230, splash:100, lob:true, unlock:10, desc:'End-game crowd clearer.'},
+ {id:'toast', name:'Toast Turret', img:'toast_turret.png', cost:125, cool:5, hp:230, dmg:18, rate:.85, shot:'corn_kernel.png', speed:380, unlock:2, desc:'Cheap fast toast crumbs.'},
+ {id:'sushi', name:'Sushi Spinner', img:'sushi_spinner.png', cost:175, cool:7, hp:230, dmg:26, rate:1.25, shot:'pizza_slice.png', speed:330, rowSplash:true, unlock:5, desc:'Hits close enemies in nearby rows.'},
+ {id:'carrot', name:'Carrot Spikes', img:'carrot_spikes.png', cost:100, cool:5, hp:160, role:'spike', dmg:18, rate:.65, unlock:6, desc:'Damages enemies walking over it.'},
+ {id:'nacho', name:'Nacho Nova', img:'nacho_nova.png', cost:250, cool:18, hp:130, role:'bomb', dmg:220, unlock:10, desc:'One-tile burst when touched.'},
+ {id:'waffle', name:'Waffle Guard', img:'waffle_guard.png', cost:150, cool:7, hp:1100, role:'wall', thorns:10, unlock:8, desc:'Tough wall that scratches back.'},
+ {id:'salad', name:'Salad Spinner', img:'salad_spinner.png', cost:125, cool:5, hp:230, dmg:18, rate:1.05, shot:'pickle.png', speed:340, effect:'freshMoney', campaign:'cafeteria', unlock:1, desc:'Cafeteria exclusive. Fast greens can shake loose bonus cash.'},
+ {id:'soup', name:'Soup Slinger', img:'soup_slinger.png', cost:150, cool:6, hp:230, dmg:22, rate:1.55, shot:'sauce_drop.png', speed:300, splash:62, effect:'burn', campaign:'restaurant', unlock:1, desc:'Restaurant exclusive. Hot splash damage keeps lanes under control.'},
+ {id:'licorice', name:'Licorice Whip', img:'licorice_whip.png', cost:125, cool:6, hp:225, dmg:30, rate:1.85, shot:'noodle.png', speed:325, pierce:4, effect:'slow2', campaign:'candy', unlock:1, desc:'Candy exclusive. Sticky piercing whip shots.'},
+ {id:'gravy', name:'Gravy Boat', img:'gravy_boat.png', cost:175, cool:7, hp:230, dmg:44, rate:2.35, shot:'sauce_drop.png', speed:255, splash:86, effect:'slow2', campaign:'thanksgiving', unlock:1, desc:'Thanksgiving exclusive. Gravy slows crowds in a splash.'},
+ {id:'cheese', name:'Cheese Wheel', img:'cheese_wheel.png', cost:175, cool:7, hp:235, dmg:36, rate:1.45, shot:'pizza_slice.png', speed:370, pierce:5, effect:'stun', campaign:'pizza', unlock:1, desc:'Pizza exclusive. Rolling cheese stuns and pierces.'},
+ {id:'pancake', name:'Pancake Stack', img:'pancake_stack.png', cost:125, cool:7, hp:1450, role:'wall', regen:20, campaign:'breakfast', unlock:1, desc:'Breakfast exclusive. A wall that slowly rebuilds itself.'},
+ {id:'popcorn', name:'Popcorn Popper', img:'popcorn_popper.png', cost:175, cool:7, hp:225, dmg:16, rate:1.25, shot:'corn_kernel.png', speed:350, multi:3, splash:28, campaign:'theater', unlock:1, desc:'Theater exclusive. Triple popcorn bursts.'},
+ {id:'milk', name:'Milk Carton Medic', img:'milk_carton_medic.png', cost:150, cool:8, hp:240, role:'healer', heal:26, rate:1.4, campaign:'school', unlock:1, desc:'School exclusive. Heals nearby foods instead of shooting.'},
+ {id:'funnel', name:'Funnel Cake Fan', img:'funnel_cake_fan.png', cost:200, cool:8, hp:230, dmg:21, rate:1.0, shot:'noodle.png', speed:325, rowSplash:true, spreadRows:true, effect:'knock', campaign:'carnival', unlock:1, desc:'Carnival exclusive. Fans shots across three lanes.'},
+ {id:'frozenpeas', name:'Frozen Pea Bag', img:'frozen_pea_bag.png', cost:175, cool:7, hp:230, dmg:22, rate:1.65, shot:'ice_scoop.png', speed:285, rowSplash:true, effect:'freeze', campaign:'freezer', unlock:1, desc:'Freezer exclusive. Cold peas chill nearby enemies.'}
+];
+const enemyDefs = {
+ geek:{name:'Geek', img:'geek.png', hp:86, speed:19, atk:20, worth:6, desc:'Low strength eater with books.'},
+ cheer:{name:'Cheerleader', img:'cheerleader.png', hp:78, speed:33, atk:18, worth:7, behavior:'jump', desc:'Cartwheels over the first food.'},
+ jock:{name:'Jock', img:'jock.png', hp:185, speed:23, atk:42, worth:12, behavior:'trample', desc:'Can crush weak defenses.'},
+ baller:{name:'Basketball Player', img:'basketball_player.png', hp:125, speed:25, atk:27, worth:9, desc:'Balanced lunch rusher.'},
+ zombie:{name:'Zombie', img:'zombie_human.png', hp:190, speed:15, atk:35, worth:13, desc:'Slow, tough, never full.'},
+ bomb:{name:'Bomb Threat Boy', img:'bomb_boy.png', hp:115, speed:26, atk:90, worth:15, behavior:'explode', desc:'Explodes when stopped.'},
+ football:{name:'Football Team', img:'footballer.png', hp:240, speed:26, atk:55, worth:18, behavior:'trample', desc:'Heavy trampler.'},
+ rusher:{name:'Lunch Rusher', img:'lunch_rusher.png', hp:105, speed:42, atk:20, worth:10, desc:'Very fast with a tray.'},
+ janitor:{name:'Janitor', img:'janitor.png', hp:135, speed:23, atk:28, worth:11, behavior:'cleaner', desc:'Sweeps away traps and spikes.'},
+ critic:{name:'Food Critic', img:'food_critic.png', hp:118, speed:20, atk:24, worth:13, behavior:'critic', desc:'Gives bad reviews that chunk one defender.'},
+ sugar:{name:'Sugar-Rush Kid', img:'sugar_kid.png', hp:92, speed:31, atk:18, worth:10, behavior:'sugarRush', desc:'Speeds up after the first hit.'},
+ uncle:{name:'Hungry Uncle', img:'hungry_uncle.png', hp:265, speed:17, atk:48, worth:18, behavior:'armor', desc:'Takes reduced projectile damage.'},
+ delivery:{name:'Delivery Dude', img:'delivery_dude.png', hp:112, speed:44, atk:22, worth:13, behavior:'laneSwap', desc:'Sidesteps into another lane once.'},
+ earlybird:{name:'Early Bird', img:'early_bird.png', hp:94, speed:39, atk:17, worth:11, behavior:'steal', desc:'Steals loose lunch money if ignored.'},
+ usher:{name:'Usher', img:'usher.png', hp:138, speed:22, atk:26, worth:13, behavior:'dim', desc:'Temporarily dims the board.'},
+ monitor:{name:'Hall Monitor', img:'hall_monitor.png', hp:170, speed:22, atk:32, worth:15, behavior:'buff', desc:'Hurries nearby classmates forward.'},
+ clown:{name:'Circus Clown', img:'circus_clown.png', hp:96, speed:29, atk:20, worth:13, behavior:'split', desc:'Splits into tiny rushers when defeated.'},
+ parka:{name:'Parka Shopper', img:'parka_shopper.png', hp:190, speed:19, atk:34, worth:16, behavior:'freezeResist', desc:'Resists freezer weapons.'}
+};
+const campaignDefs = [
+ {id:'cafeteria', name:'Cafeteria Chaos', short:'Cafeteria', subtitle:'The original lunch rush.', mechanic:'Mint drops are worth +$5; Janitors sweep traps.', wall:'#0d733d', trim:'#743019', floor1:'#f9f0d7', floor2:'#eee5ca', panel:'#8e3b2d', edge:'#4c1d1b', bonus:['geek'], enemy:'janitor', food:'salad', track:'music_cafeteria.mp3'},
+ {id:'restaurant', name:'Restaurant Rush', short:'Restaurant', subtitle:'Dinner service gets rowdy.', mechanic:'Every fifth defeated human drops a tip.', wall:'#6e1f1d', trim:'#3b1612', floor1:'#f5dfbd', floor2:'#e8cda5', panel:'#9c3f28', edge:'#4b1712', bonus:['baller','jock'], enemy:'critic', food:'soup', track:'music_restaurant.mp3'},
+ {id:'candy', name:'Candy Store Clash', short:'Candy Store', subtitle:'Sugary aisles, sticky trouble.', mechanic:'Sticky effects last longer, but sugar kids speed up when hit.', wall:'#91448c', trim:'#4c2451', floor1:'#ffe5f7', floor2:'#ead4ff', panel:'#a33c75', edge:'#4d1c3d', bonus:['cheer','rusher'], enemy:'sugar', food:'licorice', track:'music_candy.mp3'},
+ {id:'thanksgiving', name:'Thanksgiving Dinner', short:'Thanksgiving', subtitle:'Protect the feast table.', mechanic:'Wall foods get +20% HP; armored uncles resist damage.', wall:'#7a3c13', trim:'#3c1b0b', floor1:'#f3d5a6', floor2:'#e6bd81', panel:'#8a3e1f', edge:'#421d0f', bonus:['football','zombie'], enemy:'uncle', food:'gravy', track:'music_thanksgiving.mp3'},
+ {id:'pizza', name:'Pizza Parlor Panic', short:'Pizza Parlor', subtitle:'Slices versus snackers.', mechanic:'Rolling foods pierce harder; delivery dudes swap lanes.', wall:'#2f6c43', trim:'#713314', floor1:'#f8e2bf', floor2:'#efc78d', panel:'#9b3725', edge:'#431914', bonus:['jock','rusher'], enemy:'delivery', food:'cheese', track:'music_pizza.mp3'},
+ {id:'breakfast', name:'Breakfast Bonanza', short:'Breakfast', subtitle:'Morning rush meltdown.', mechanic:'Mint produces faster; early birds steal loose money.', wall:'#2f7290', trim:'#9c6727', floor1:'#fff1bf', floor2:'#e8dca5', panel:'#9d6b2c', edge:'#513316', bonus:['geek','cheer'], enemy:'earlybird', food:'pancake', track:'music_breakfast.mp3'},
+ {id:'theater', name:'Movie Theater Munch', short:'Theater', subtitle:'Defend the concession stand.', mechanic:'Popcorn bursts shine, but ushers can dim the board.', wall:'#151b4d', trim:'#561720', floor1:'#d7d0e8', floor2:'#bfb6d2', panel:'#5b2c73', edge:'#211034', bonus:['bomb','baller'], enemy:'usher', food:'popcorn', track:'music_theater.mp3'},
+ {id:'school', name:'School Lunch Siege', short:'School Lunch', subtitle:'Cafeteria chaos after the bell.', mechanic:'Milk can heal defenders; hall monitors buff nearby enemies.', wall:'#234f75', trim:'#78431f', floor1:'#e7e2c5', floor2:'#d2cba6', panel:'#315b7e', edge:'#18304a', bonus:['geek','football'], enemy:'monitor', food:'milk', track:'music_school.mp3'},
+ {id:'carnival', name:'Carnival Snackdown', short:'Carnival', subtitle:'Midway food fights back.', mechanic:'Fan shots hit three lanes; clowns split when defeated.', wall:'#8f2b24', trim:'#e1b635', floor1:'#ffe2a8', floor2:'#ffd07a', panel:'#a7432c', edge:'#521815', bonus:['rusher','bomb','cheer'], enemy:'clown', food:'funnel', track:'music_carnival.mp3'},
+ {id:'freezer', name:'Freezer Aisle Frenzy', short:'Freezer Aisle', subtitle:'Cold aisle, hot tempers.', mechanic:'Most enemies move slower, but parka shoppers resist freeze.', wall:'#236b7f', trim:'#16404a', floor1:'#e8fbff', floor2:'#cdeef7', panel:'#296c83', edge:'#123b4a', bonus:['zombie','football','bomb'], enemy:'parka', food:'frozenpeas', track:'music_freezer.mp3'}
+];
+function currentCampaignDef(){ return campaignDefs[selectedCampaign] || campaignDefs[0]; }
+function splitLabel(text){ const words=text.split(' '); if(words.length<3) return [text]; const mid=Math.ceil(words.length/2); return [words.slice(0,mid).join(' '), words.slice(mid).join(' ')]; }
+function byId(id){ return weaponDefs.find(w=>w.id===id); }
+
+let state='loading';
+let buttons=[];
+let selectedCampaign=0;
+let selectedLevel=1;
+let chosenIds=['mint','jello','wall','toast','gum','corn'];
+let currentTip='';
+let game=null;
+let hovered=null;
+let last=performance.now();
+let loadingSpin=0;
+const oldSaveKey='foodfight_html5_progress_v1';
+const campaignSaveKey='foodfight_html5_campaign_progress_v2';
+const oldProgress=Number(localStorage.getItem(oldSaveKey)||1);
+let campaignProgress;
+try{ campaignProgress=JSON.parse(localStorage.getItem(campaignSaveKey)||'null'); }catch(e){ campaignProgress=null; }
+if(!Array.isArray(campaignProgress) || campaignProgress.length!==campaignDefs.length){ campaignProgress=campaignDefs.map((_,i)=>i===0?clamp(oldProgress||1,1,10):1); }
+function saveCampaignProgress(){ localStorage.setItem(campaignSaveKey, JSON.stringify(campaignProgress)); }
+function progressForCampaign(i=selectedCampaign){ return clamp(Number(campaignProgress[i]||1),1,10); }
+
+function resetButtons(){ buttons=[]; }
+function addButton(label,x,y,w,h,fn,opts={}){ buttons.push({label,x,y,w,h,fn,opts}); }
+function inRect(p,b){return p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h;}
+function screenPoint(ev){ const r=canvas.getBoundingClientRect(); const t=ev.touches?ev.touches[0]:ev; return {x:(t.clientX-r.left)*W/r.width, y:(t.clientY-r.top)*H/r.height}; }
+canvas.addEventListener('pointerdown', ev=>{ ev.preventDefault(); unlockAudio(); const p=screenPoint(ev); handleClick(p); });
+canvas.addEventListener('pointermove', ev=>{ hovered=screenPoint(ev); });
+
+function drawText(text,x,y,size=20,color='#fff',align='left',stroke=true){
+ ctx.save(); ctx.font=`bold ${size}px Trebuchet MS, Comic Sans MS, sans-serif`; ctx.textAlign=align; ctx.textBaseline='top';
+ if(stroke){ ctx.lineWidth=Math.max(3,size/7); ctx.strokeStyle='rgba(36,22,12,.85)'; ctx.strokeText(text,x,y); }
+ ctx.fillStyle=color; ctx.fillText(text,x,y); ctx.restore();
+}
+function drawPanel(x,y,w,h,fill='#8e3b2d',edge='#481b1a'){
+ ctx.save(); ctx.fillStyle=edge; roundRect(x-5,y-5,w+10,h+10,14); ctx.fill(); ctx.fillStyle=fill; roundRect(x,y,w,h,12); ctx.fill(); ctx.strokeStyle='rgba(255,230,160,.25)'; ctx.lineWidth=3; ctx.stroke(); ctx.restore();
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function drawButton(b){
+ const hot=hovered&&inRect(hovered,b); ctx.save();
+ ctx.fillStyle=b.opts.small?'#c5792b': hot?'#d2853b':'#a95534'; roundRect(b.x,b.y,b.w,b.h,12); ctx.fill();
+ ctx.strokeStyle=hot?'#ffe783':'#5f1d18'; ctx.lineWidth=4; ctx.stroke();
+ drawText(b.label,b.x+b.w/2,b.y+b.h/2-(b.opts.size||24)/2,b.opts.size||24,'#fff2cf','center'); ctx.restore();
+}
+function bgCafeteria(theme=campaignDefs[0]){
+ const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,theme.wall||'#0e2e38'); g.addColorStop(.44,theme.wall||'#102d35'); g.addColorStop(.45,theme.floor1||'#eee8ce'); g.addColorStop(1,theme.floor2||'#d8ceb0'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+ ctx.fillStyle='rgba(255,255,255,.13)'; ctx.fillRect(0,236,W,8);
+ // tile floor
+ for(let y=250;y<H;y+=58){ ctx.strokeStyle='rgba(100,80,55,.15)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+ for(let x=0;x<W;x+=92){ ctx.strokeStyle='rgba(100,80,55,.13)'; ctx.beginPath(); ctx.moveTo(x,245); ctx.lineTo(x+90,H); ctx.stroke(); }
+}
+function drawCabinet(){
+ ctx.save();
+ ctx.fillStyle='#7d321f'; roundRect(650,54,255,415,10); ctx.fill(); ctx.strokeStyle='#3b1813'; ctx.lineWidth=6; ctx.stroke();
+ ctx.fillStyle='#b76139'; ctx.beginPath(); ctx.moveTo(650,54); ctx.lineTo(878,35); ctx.lineTo(925,80); ctx.lineTo(905,100); ctx.lineTo(650,100); ctx.closePath(); ctx.fill();
+ ctx.restore();
+}
+function drawFoodMascot(){
+ const im=img['mint_plant.png']; ctx.drawImage(im,455,275,135,135);
+ ctx.drawImage(img['lunch_money.png'],430,380,42,42); ctx.drawImage(img['lunch_money.png'],604,385,42,42);
+}
+function setState(s){ state=s; resetButtons(); if(s==='menu') playMusic('menu'); if(s==='play') playMusic('game'); }
+
+function menu(){
+ resetButtons();
+ bgCafeteria(); ctx.drawImage(img['title_foodfight.png'],45,25,335,154); drawFoodMascot(); drawCabinet();
+ drawText('Welcome, Commander Corn',62,216,25,'#f3f5c9');
+ drawText('A fan-made HTML5 prototype with original sprites.',62,252,16,'#f1dfaf');
+ addButton('FIGHT',684,100,180,58,()=>{selectedLevel=progressForCampaign(selectedCampaign); setState('campaigns');});
+ addButton('MY FOOD',684,172,180,58,()=>setState('fooddex'));
+ addButton('ENEMIES',684,244,180,58,()=>setState('enemydex'));
+ addButton('INVITE',684,316,180,58,()=>{currentTip='Invite bonus: +25 lunch money is included in spirit only. No real IAP here.'; setState('help');});
+ addButton('HELP',684,398,91,50,()=>{currentTip='Plant mint for money, defend each lane, and let sweepers save you once per row.'; setState('help');},{small:true,size:20});
+ addButton('OPTIONS',792,398,91,50,()=>setState('options'),{small:true,size:20});
+ drawText('v1.3 slower waves + faster mint',820,495,16,'#401b15','center',false);
+ buttons.forEach(drawButton);
+}
+
+function campaigns(){
+ resetButtons();
+ bgCafeteria(campaignDefs[0]); ctx.drawImage(img['title_foodfight.png'],35,18,265,122); drawPanel(70,100,820,360,'#743628'); drawText('CHOOSE A CAMPAIGN',480,118,30,'#fff2cf','center');
+ const cols=5,bw=146,bh=112,sx=98,sy=170;
+ campaignDefs.forEach((c,i)=>{ const x=sx+(i%cols)*154, y=sy+Math.floor(i/cols)*128; drawPanel(x,y,bw,bh,c.panel,c.edge); ctx.fillStyle=c.wall; roundRect(x+12,y+12,bw-24,28,7); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.stroke(); const label=splitLabel(c.name); label.forEach((line,j)=>drawText(line,x+bw/2,y+47+j*16,14,'#fff6d4','center')); drawText(`Level ${progressForCampaign(i)}/10`,x+bw/2,y+86,14,'#ffdf64','center'); addButton('',x,y,bw,bh,()=>{ selectedCampaign=i; selectedLevel=progressForCampaign(i); setState('levels'); },{blank:true}); });
+ addButton('BACK',32,468,105,45,()=>setState('menu'),{size:20}); buttons.forEach(b=>{ if(!b.opts.blank) drawButton(b); });
+}
+function levels(){
+ resetButtons();
+ const camp=currentCampaignDef(); const prog=progressForCampaign();
+ bgCafeteria(camp); ctx.drawImage(img['title_foodfight.png'],35,18,265,122); drawPanel(110,116,740,334,camp.panel,camp.edge); drawText(camp.name.toUpperCase(),480,136,28,'#fff2cf','center'); drawText(camp.subtitle,480,170,16,'#ffe1a5','center');
+ drawText('Mechanic: '+camp.mechanic,480,194,13,'#fff0bf','center');
+ const cols=5, bw=118,bh=70, sx=176, sy=224;
+ for(let i=1;i<=10;i++){ const x=sx+((i-1)%cols)*135, y=sy+Math.floor((i-1)/cols)*92; const locked=i>Math.max(prog,1)+1; addButton((locked?'LOCKED':'LEVEL '+i),x,y,bw,bh,()=>{ if(locked){sfx('sfx_click.mp3'); return;} selectedLevel=i; setState('weapons'); },{size:locked?18:22}); if(i<=prog){ drawText('★',x+92,y-4,28,'#ffd84b'); } }
+ addButton('BACK',32,468,105,45,()=>setState('campaigns'),{size:20}); buttons.forEach(drawButton);
+ drawText(`${camp.short} progress: level ${prog}`,480,464,18,'#fff0bf','center');
+}
+function unlockedForLevel(){ return weaponDefs.filter(w=>w.unlock<=selectedLevel); }
+function weaponSelect(){
+ resetButtons();
+ const camp=currentCampaignDef(); bgCafeteria(camp); drawPanel(54,42,852,438,camp.panel,camp.edge); drawText('CHOOSE YOUR WEAPONS',480,55,26,'#fff2cf','center'); drawText(`${camp.name} - Level ${selectedLevel}. Pick up to 6. Campaign food: ${byId(camp.food).name}.`,480,88,14,'#ffe1a5','center');
+ const list=weaponDefs.filter(w=>!w.campaign || w.campaign===camp.id);
+ chosenIds=chosenIds.filter(id=>list.some(w=>w.id===id && w.unlock<=selectedLevel)).slice(0,6);
+ const sx=84, sy=112, cw=96, ch=64, gapX=106, gapY=70;
+ list.forEach((w,i)=>{ const x=sx+(i%8)*gapX, y=sy+Math.floor(i/8)*gapY; const lock=w.unlock>selectedLevel; ctx.save(); ctx.globalAlpha=lock ? 0.38 : 1; drawPanel(x,y,cw,ch, chosenIds.includes(w.id)?'#366830':(w.campaign?'#604070':'#2b4250'),'#20302b'); ctx.drawImage(img[w.img],x+5,y+4,42,42); drawText(String(w.cost),x+50,y+7,12,'#fff1a2','left'); drawText(w.name,x+cw/2,y+45,10,'#fff2d5','center'); ctx.restore(); if(lock){ ctx.drawImage(img['lock.png'],x+30,y+9,30,30); drawText('L'+w.unlock,x+46,y+36,10,'#fff','center'); } else { addButton('',x,y,cw,ch,()=>toggleWeapon(w.id),{blank:true}); } });
+ addButton('START FIGHT',352,486,170,42,()=>{ if(chosenIds.length===0) chosenIds=['mint','jello']; startLoading(); },{size:20});
+ addButton('BACK',35,486,100,42,()=>setState('levels'),{size:20});
+ drawText(`${chosenIds.length}/6 selected`,650,493,18,'#fff0bf');
+ buttons.forEach(b=>{ if(!b.opts.blank) drawButton(b); });
+}
+function toggleWeapon(id){ const i=chosenIds.indexOf(id); if(i>=0) chosenIds.splice(i,1); else { if(chosenIds.length>=6) chosenIds.shift(); chosenIds.push(id); } sfx('sfx_click.mp3'); }
+function startLoading(){ setState('loading'); loadingSpin=0; setTimeout(()=>startLevel(selectedLevel),600); }
+
+function fooddex(){
+ resetButtons();
+ bgCafeteria(); drawPanel(28,24,904,462,'#843625'); drawText('MY FOOD',480,38,28,'#fff2cf','center');
+ const sx=55,sy=78,cw=98,ch=62,gx=108,gy=68; weaponDefs.forEach((w,i)=>{ const x=sx+(i%8)*gx,y=sy+Math.floor(i/8)*gy; drawPanel(x,y,cw,ch,w.campaign?'#3f315c':'#213f4a','#12313a'); ctx.drawImage(img[w.img],x+4,y+5,38,38); drawText(w.name,x+45,y+7,10,'#fff6d4'); drawText('$'+w.cost,x+45,y+23,10,'#ffdb65'); if(w.campaign){ drawText(w.campaign,x+45,y+39,9,'#d8ffcc','left',false); } });
+ addButton('BACK',35,490,110,40,()=>setState('menu'),{size:20}); buttons.forEach(drawButton);
+}
+function enemydex(){
+ resetButtons();
+ bgCafeteria(); drawPanel(32,24,896,462,'#8d291e'); drawText('ENEMIES',480,38,28,'#fff2cf','center');
+ const list=Object.entries(enemyDefs); const sx=62,sy=78,cw=135,ch=114,gx=144,gy=124; list.forEach(([id,e],i)=>{ const x=sx+(i%6)*gx,y=sy+Math.floor(i/6)*gy; drawPanel(x,y,cw,ch,'#22323d','#381a15'); ctx.fillStyle='rgba(255,255,190,.15)'; ctx.beginPath(); ctx.ellipse(x+67,y+49,50,28,0,0,Math.PI*2); ctx.fill(); ctx.drawImage(img[e.img],x+25,y+2,78,78); drawText(e.name,x+8,y+77,12,'#fff2cf'); drawText(`Atk ${e.atk}  HP ${e.hp}`,x+8,y+94,10,'#ffe1b0'); });
+ addButton('BACK',35,490,110,40,()=>setState('menu'),{size:20}); buttons.forEach(drawButton);
+}
+function help(){
+ resetButtons();
+ bgCafeteria(); drawPanel(128,80,704,350,'#7c3428'); drawText('HELP',480,102,34,'#fff2cf','center');
+ const lines=[currentTip||'Plant food, stop humans, save lunch.', 'Mint Plants make lunch money. Spend it on defenders.', 'Electric sweepers clear a lane once, then they are gone.', 'Each campaign now has exclusive food, enemies, mechanics, and music.', 'There are no real purchases, ads, or online checks in this prototype.'];
+ lines.forEach((l,i)=>drawText(l,174,162+i*44,20,'#fff0c8'));
+ addButton('BACK',420,374,120,42,()=>setState('menu'),{size:20}); buttons.forEach(drawButton);
+}
+function options(){
+ resetButtons();
+ bgCafeteria(); drawPanel(128,80,704,350,'#7c3428'); drawText('OPTIONS',480,102,34,'#fff2cf','center');
+ drawText('Audio files are root MP3s. Sprites are root PNGs. CSS and JS are embedded.',480,165,18,'#fff0c8','center');
+ addButton('RESET PROGRESS',330,228,300,48,()=>{ campaignProgress=campaignDefs.map(()=>1); saveCampaignProgress(); localStorage.setItem(oldSaveKey,'1'); currentTip='All campaign progress reset.'; setState('help');},{size:22});
+ addButton('BACK',420,374,120,42,()=>setState('menu'),{size:20}); buttons.forEach(drawButton);
+}
+
+function handleClick(p){
+ if(state==='play'){ gameClick(p); return; }
+ const hit=[...buttons].reverse().find(b=>inRect(p,b));
+ if(hit){ sfx('sfx_click.mp3'); hit.fn(); }
+}
+
+function startLevel(level){
+ const camp=currentCampaignDef();
+ chosenIds = chosenIds.filter(id=>{ const w=byId(id); return w && w.unlock<=level && (!w.campaign || w.campaign===camp.id); }).slice(0,6);
+ if(!chosenIds.length) chosenIds=['mint','jello',camp.food].filter(id=>byId(id));
+ const chosen=chosenIds.map(byId).filter(Boolean);
+ game={
+  level, campaign:selectedCampaign, campaignName:camp.name, chosen, money: level===1?175:155+level*30, plants:[], enemies:[], projectiles:[], coins:[], particles:[], selected:null, shovel:false,
+  cooldowns:{}, sweepers:[true,true,true,true,true], ready:3.2, win:false, lose:false, spawnTimer:0, spawned:0, wave:buildWave(level, selectedCampaign), message:'READY', shake:0, killed:0, dark:0
+ };
+ weaponDefs.forEach(w=>game.cooldowns[w.id]=0);
+ setState('play');
+}
+function buildWave(level,campaignIndex=0){
+ const camp=campaignDefs[campaignIndex] || campaignDefs[0];
+ const pool=['geek']; if(level>=2) pool.push('cheer','baller'); if(level>=3) pool.push('jock'); if(level>=5) pool.push('zombie'); if(level>=6) pool.push('bomb'); if(level>=8) pool.push('rusher'); if(level>=9) pool.push('football');
+ if(camp.enemy && enemyDefs[camp.enemy]){ pool.push(camp.enemy); if(level>=4) pool.push(camp.enemy); }
+ (camp.bonus||[]).forEach(t=>{ if(enemyDefs[t] && !pool.includes(t)) pool.push(t); pool.push(t); });
+ const wave=[]; const count=Math.round(5+level*2.25+campaignIndex*.18); let t=0;
+ // Slower, more readable waves: larger gaps between humans, especially in early levels.
+ const minGap=Math.max(3.25,5.45-level*.055-campaignIndex*.004);
+ const maxGap=Math.max(4.8,8.35-level*.045-campaignIndex*.004);
+ for(let i=0;i<count;i++){ t += rnd(minGap,maxGap); let type=pool[Math.floor(Math.random()*pool.length)]; if(i%10===8 && camp.enemy) type=camp.enemy; if(i%14===11 && level>=6) type=(camp.enemy||'bomb'); wave.push({time:t,type}); }
+ for(let i=0;i<Math.min(level,5);i++) wave.push({time:t+11+i*3.0,type:pool[Math.floor(Math.random()*pool.length)]});
+ return wave.sort((a,b)=>a.time-b.time);
+}
+function spawnEnemy(type){
+ const d=enemyDefs[type] || enemyDefs.geek; const camp=campaignDefs[game.campaign] || campaignDefs[0]; const row=Math.floor(Math.random()*grid.rows); const scale=1+game.level*.028+game.campaign*.01;
+ let speed=d.speed*(1+game.level*.012); if(camp.id==='freezer' && d.behavior!=='freezeResist') speed*=.88;
+ game.enemies.push({type,row,x:W+40,y:rowY(row)+10,hp:d.hp*scale,maxHp:d.hp*scale,speed,atk:d.atk*scale,cool:0,stun:0,slow:0,freeze:0,jumped:false,bleed:0,burn:0,boost:0,frame:Math.random()*10});
+}
+function addParticle(x,y,text,color='#fff'){ game.particles.push({x,y,text,color,life:1,vy:-35}); }
+function dropMoney(x,y,amount){ game.coins.push({x,y,amount,life:8,vy:0,spin:0}); }
+function plantAt(row,col){ return game.plants.find(p=>p.row===row&&p.col===col); }
+function addPlant(w,row,col){ const camp=campaignDefs[game.campaign] || campaignDefs[0]; let hp=w.hp; if(camp.id==='thanksgiving' && w.role==='wall') hp*=1.2; game.plants.push({id:w.id,row,col,hp,maxHp:hp,last:0,money:0,anim:0}); game.money-=w.cost; game.cooldowns[w.id]=w.cool; sfx('sfx_plant.mp3',.7); }
+function gameClick(p){
+ if(game.win||game.lose){ if(p.x>360&&p.x<600&&p.y>300&&p.y<355){ setState('levels'); playMusic('menu'); } return; }
+ if(p.x>800 && p.y<66){ setState('menu'); playMusic('menu'); return; }
+ // collect coins first
+ for(let i=game.coins.length-1;i>=0;i--){ const c=game.coins[i]; if(Math.hypot(p.x-c.x,p.y-c.y)<34){ game.money+=c.amount; addParticle(c.x,c.y,'+$'+c.amount,'#fff06a'); game.coins.splice(i,1); sfx('sfx_coin.mp3',.9); return; } }
+ // seedbank
+ for(let i=0;i<game.chosen.length;i++){ const y=74+i*72; if(p.x>=7&&p.x<=88&&p.y>=y&&p.y<=y+62){ const w=game.chosen[i]; if(game.cooldowns[w.id]<=0 && game.money>=w.cost){ game.selected=w.id; game.shovel=false; } else { addParticle(100,y+30, game.money<w.cost?'Need money':'Cooling','#ffdf74'); } return; } }
+ // shovel
+ if(p.x>=10&&p.x<=86&&p.y>=496&&p.y<=534){ game.shovel=!game.shovel; game.selected=null; sfx('sfx_click.mp3'); return; }
+ // board
+ const col=Math.floor((p.x-grid.x)/grid.cw), row=Math.floor((p.y-grid.y)/grid.ch);
+ if(row>=0&&row<grid.rows&&col>=0&&col<grid.cols){
+   const existing=plantAt(row,col);
+   if(game.shovel){ if(existing){ game.plants=game.plants.filter(pl=>pl!==existing); addParticle(colX(col),rowY(row),'removed','#ffffff'); sfx('sfx_click.mp3'); } return; }
+   if(game.selected && !existing){ const w=byId(game.selected); if(w && game.money>=w.cost && game.cooldowns[w.id]<=0) addPlant(w,row,col); return; }
+ }
+}
+
+function update(dt){
+ if(state!=='play' || !game) return;
+ dt=clamp(dt,0,.05); if(game.shake>0) game.shake-=dt;
+ Object.keys(game.cooldowns).forEach(k=>{ if(game.cooldowns[k]>0) game.cooldowns[k]-=dt; });
+ game.particles.forEach(p=>{p.life-=dt; p.y+=p.vy*dt;}); game.particles=game.particles.filter(p=>p.life>0);
+ game.coins.forEach(c=>{ c.life-=dt; c.spin+=dt*4; c.y+=Math.sin(c.spin)*.08; }); game.coins=game.coins.filter(c=>c.life>0);
+ if(game.win||game.lose) return;
+ const camp=campaignDefs[game.campaign] || campaignDefs[0]; if(game.dark>0) game.dark-=dt;
+ if(game.ready>0){ game.ready-=dt; if(game.ready>2.15) game.message='READY'; else if(game.ready>1.05) game.message='SET'; else game.message='PREPARE!'; return; }
+ game.spawnTimer+=dt;
+ while(game.spawned<game.wave.length && game.spawnTimer>=game.wave[game.spawned].time){ spawnEnemy(game.wave[game.spawned].type); game.spawned++; }
+ // plants
+ for(const p of game.plants){ p.anim+=dt; const w=byId(p.id); if(!w) continue; const px=colX(p.col), py=rowY(p.row);
+   if(w.role==='money'){ const mintEvery=camp.id==='breakfast'?3.25:4.25; const mintVal=25+(camp.id==='cafeteria'?5:0); p.money+=dt; if(p.money>=mintEvery){ p.money=0; dropMoney(px+rnd(-12,12),py-38,mintVal); } continue; }
+   if(w.role==='healer'){ p.last-=dt; if(p.last<=0){ const allies=game.plants.filter(a=>a!==p && Math.abs(a.row-p.row)<=1 && a.hp<a.maxHp); if(allies.length){ allies.sort((a,b)=>(a.hp/a.maxHp)-(b.hp/b.maxHp)); allies[0].hp=Math.min(allies[0].maxHp,allies[0].hp+(w.heal||20)); addParticle(colX(allies[0].col),rowY(allies[0].row)-35,'+heal','#d8f9ff'); } p.last=w.rate||1.5; } continue; }
+   if(w.role==='trap' || w.role==='bomb'){
+     const e=game.enemies.find(e=>e.row===p.row && Math.abs(e.x-px)<35);
+     if(e){ damageEnemy(e,w.dmg||120,w.effect,px,py); if(w.role==='bomb'){ splash(px,py,w.dmg||200,95); } game.plants=game.plants.filter(pl=>pl!==p); addParticle(px,py,w.role==='bomb'?'NOVA!':'CHOMP!','#fff27a'); game.shake=.16; }
+     continue;
+   }
+   if(w.role==='spike'){
+     p.last-=dt; if(p.last<=0){ const e=game.enemies.find(e=>e.row===p.row && Math.abs(e.x-px)<38); if(e){ damageEnemy(e,w.dmg,w.effect,px,py); p.last=w.rate; } }
+     continue;
+   }
+   if(w.regen && p.hp<p.maxHp) p.hp=Math.min(p.maxHp,p.hp+w.regen*dt);
+   if(w.role==='wall') continue;
+   p.last-=dt;
+   const target=game.enemies.filter(e=>Math.abs(e.row-p.row)<=0 && e.x>px-10).sort((a,b)=>a.x-b.x)[0];
+   if(target && p.last<=0){
+     const rowOffsets=w.spreadRows?[-1,0,1]:[0]; for(const ro of rowOffsets){ const prow=p.row+ro; if(prow<0||prow>=grid.rows) continue; const shots=w.multi||1; for(let s=0;s<shots;s++){ game.projectiles.push({x:px+28,y:py-18+(s-(shots-1)/2)*10+ro*6,row:prow,dmg:w.dmg,speed:w.speed||300,effect:w.effect,shot:w.shot||'jello_blob.png',splash:w.splash||0,pierce:w.pierce||1,lob:!!w.lob,age:0,rowSplash:w.rowSplash}); } }
+     p.last=w.rate||1.5; sfx('sfx_shoot.mp3',.35);
+   }
+ }
+ // projectiles
+ for(const pr of game.projectiles){ pr.age+=dt; pr.x += pr.speed*dt; if(pr.lob) pr.y += Math.sin(pr.age*8)*10*dt; const hit=game.enemies.filter(e=>Math.abs(e.row-pr.row)<=0 && Math.abs(e.x-pr.x)<28).sort((a,b)=>a.x-b.x)[0]; if(hit){ damageEnemy(hit,pr.dmg,pr.effect,pr.x,pr.y); if(pr.splash) splash(pr.x,pr.y,pr.dmg*.65,pr.splash); if(pr.rowSplash){ for(const e of game.enemies){ if(Math.abs(e.row-pr.row)<=1 && Math.abs(e.x-pr.x)<55) damageEnemy(e,pr.dmg*.45,pr.effect,pr.x,pr.y); } }
+       pr.pierce--; if(pr.pierce<=0 || pr.splash) pr.dead=true; }
+   if(pr.x>W+50) pr.dead=true;
+ }
+ game.projectiles=game.projectiles.filter(p=>!p.dead);
+ // enemies
+ for(const e of game.enemies){ const d=enemyDefs[e.type] || enemyDefs.geek; e.frame+=dt;
+   if(d.behavior==='dim' && !e.dimmed && e.x<760){ e.dimmed=true; game.dark=Math.max(game.dark,2.4); addParticle(e.x,rowY(e.row)-45,'lights out!','#e8dcff'); }
+   if(d.behavior==='buff'){ for(const other of game.enemies){ if(other!==e && other.row===e.row && Math.abs(other.x-e.x)<135) other.boost=Math.max(other.boost||0,.7); } }
+   if(d.behavior==='laneSwap' && !e.swapped && e.x<760 && e.x>430){ const dir=Math.random()<.5?-1:1; const nr=clamp(e.row+dir,0,grid.rows-1); if(nr!==e.row){ e.row=nr; e.swapped=true; addParticle(e.x,rowY(e.row)-30,'sidestep!','#fff27a'); } }
+   if(d.behavior==='steal'){ for(let i=game.coins.length-1;i>=0;i--){ const c=game.coins[i]; if(Math.hypot(e.x-c.x,rowY(e.row)-c.y)<42){ game.coins.splice(i,1); e.hp=Math.min(e.maxHp,e.hp+35); addParticle(e.x,rowY(e.row)-45,'stole $','#ffd76c'); break; } } }
+   if(e.stun>0){e.stun-=dt; continue;} if(e.freeze>0){e.freeze-=dt; continue;} if(e.bleed>0){ e.bleed-=dt; e.hp-=8*dt; } if(e.burn>0){ e.burn-=dt; e.hp-=11*dt; }
+   const slowMult = e.slow>0 ? .45 : 1; if(e.slow>0) e.slow-=dt; const boostMult=e.boost>0?1.18:1; if(e.boost>0) e.boost-=dt;
+   const chillMult = camp.id==='freezer' && d.behavior!=='freezeResist' ? .88 : 1;
+   const col=Math.floor((e.x-grid.x)/grid.cw); const blocker=game.plants.filter(p=>p.row===e.row && Math.abs(colX(p.col)-e.x)<35).sort((a,b)=>b.col-a.col)[0];
+   if(blocker){ const wd=byId(blocker.id);
+     if(d.behavior==='cleaner' && wd && (wd.role==='trap'||wd.role==='spike')){ blocker.hp=0; e.cool=.35; addParticle(colX(blocker.col),rowY(blocker.row)-30,'swept!','#e8f2ff'); }
+     else if(d.behavior==='jump' && !e.jumped && wd && wd.role!=='spike'){ e.x -= grid.cw*.95; e.jumped=true; addParticle(e.x,rowY(e.row)-30,'cartwheel!','#fff27a'); continue; }
+     else { e.cool-=dt;
+       if(e.cool<=0){ let damage=e.atk*(d.behavior==='trample'?1.28:1); if(d.behavior==='critic' && !e.reviewed){ damage+=45; e.reviewed=true; addParticle(colX(blocker.col),rowY(blocker.row)-46,'bad review!','#ffe0ff'); } blocker.hp-=damage; e.cool=.95; addParticle(colX(blocker.col),rowY(blocker.row)-28,'munch','#ffe0c0'); sfx('sfx_hit.mp3',.2); if(wd && wd.thorns) e.hp-=wd.thorns; if(d.behavior==='explode'){ blocker.hp-=130; splash(e.x,rowY(e.row),60,64); e.hp=0; game.shake=.2; } }
+     }
+     if(blocker.hp<=0) game.plants=game.plants.filter(p=>p!==blocker);
+   } else { e.x -= e.speed*slowMult*boostMult*chillMult*dt; }
+   if(e.x<grid.x-45){ if(game.sweepers[e.row]){ game.sweepers[e.row]=false; game.enemies=game.enemies.filter(other=>other.row!==e.row); addParticle(grid.x+90,rowY(e.row),'SWEEPER!','#e8f2ff'); sfx('sfx_sweeper.mp3',.9); game.shake=.25; break; } else { game.lose=true; sfx('sfx_lose.mp3'); playMusic('menu'); } }
+ }
+ game.enemies=game.enemies.filter(e=>!e.dead && e.hp>0);
+ if(game.spawned>=game.wave.length && game.enemies.length===0){ game.win=true; campaignProgress[game.campaign]=Math.max(progressForCampaign(game.campaign), Math.min(10, game.level+1)); saveCampaignProgress(); sfx('sfx_win.mp3'); playMusic('menu'); }
+}
+function damageEnemy(e, dmg, effect, x, y){
+ if(e.dead) return; const d=enemyDefs[e.type] || enemyDefs.geek; const camp=campaignDefs[game.campaign] || campaignDefs[0];
+ if(d.behavior==='armor') dmg*=.72;
+ if(d.behavior==='freezeResist' && effect==='freeze'){ effect='slow'; dmg*=.9; }
+ if(d.behavior==='sugarRush' && !e.rushed){ e.rushed=true; e.speed*=1.32; addParticle(e.x,rowY(e.row)-44,'sugar rush!','#ff94ed'); }
+ e.hp-=dmg;
+ if(effect==='slow') e.slow=Math.max(e.slow,camp.id==='candy'?4.4:3.4); if(effect==='slow2') e.slow=Math.max(e.slow,camp.id==='candy'?6.4:5.0); if(effect==='stun') e.stun=Math.max(e.stun,.55); if(effect==='freeze') e.freeze=Math.max(e.freeze,camp.id==='freezer'?2.25:1.7); if(effect==='knock'){ e.x+=30; e.stun=Math.max(e.stun,.25); } if(effect==='slip'){ e.stun=Math.max(e.stun,2.2); e.slow=Math.max(e.slow,4); } if(effect==='bleed') e.bleed=Math.max(e.bleed,4); if(effect==='burn') e.burn=Math.max(e.burn,3.2); if(effect==='freshMoney' && Math.random()<.28) dropMoney(x,y,3);
+ if(e.hp<=0){ e.dead=true; if(d.behavior==='split' && !e.splitDone){ e.splitDone=true; for(const off of [-1,1]){ const nr=clamp(e.row+off,0,grid.rows-1); game.enemies.push({type:'geek',row:nr,x:e.x+off*12,y:rowY(nr)+10,hp:46,maxHp:46,speed:46,atk:13,cool:0,stun:0,slow:0,freeze:0,jumped:false,bleed:0,burn:0,boost:0,frame:Math.random()*10}); } addParticle(e.x,rowY(e.row)-55,'split!','#fff27a'); }
+   addParticle(e.x,rowY(e.row)-40,'yum!','#eaff8f'); let worth=d.worth||6; dropMoney(e.x,rowY(e.row)-20,worth); if(camp.id==='restaurant' && game.killed%5===4) dropMoney(e.x+18,rowY(e.row)-28,15); game.killed++; }
+} 
+function splash(x,y,dmg,rad){ for(const e of game.enemies){ if(!e.dead && Math.hypot(e.x-x,rowY(e.row)-y)<rad) damageEnemy(e,dmg,null,x,y); } }
+
+function drawGame(){
+ ctx.save(); if(game.shake>0) ctx.translate(rnd(-5,5),rnd(-5,5));
+ // play bg
+ const camp=campaignDefs[game.campaign] || campaignDefs[0];
+ ctx.fillStyle=camp.floor1||'#efe7cf'; ctx.fillRect(0,0,W,H);
+ ctx.fillStyle=camp.wall||'#0d733d'; ctx.fillRect(0,0,W,66);
+ ctx.fillStyle=camp.trim||'#743019'; ctx.fillRect(0,0,W,22);
+ ctx.fillStyle='#e6bb55'; ctx.fillRect(455,4,300,18); ctx.fillStyle='#964f2d'; ctx.fillRect(475,8,260,10); ctx.fillStyle='#f6df80'; ctx.fillRect(482,8,(game.spawned/game.wave.length)*246,10);
+ drawText('$'+Math.floor(game.money),155,26,26,'#fff471'); drawText(camp.short+' '+game.level,360,27,16,'#fff4ce','center'); drawText('MENU',865,22,26,'#fff4ce','center');
+ ctx.drawImage(img['lunch_money.png'],110,19,42,42);
+ // seedbank
+ ctx.fillStyle='#122d36'; ctx.fillRect(0,66,96,H-66); ctx.strokeStyle='#4c1d1b'; ctx.lineWidth=5; ctx.strokeRect(0,66,96,H-66);
+ for(let i=0;i<game.chosen.length;i++){ const w=game.chosen[i], y=74+i*72, cool=clamp(game.cooldowns[w.id]/w.cool,0,1); ctx.fillStyle=game.selected===w.id?'#d6f08b':'#e6e2d0'; roundRect(8,y,80,62,8); ctx.fill(); ctx.strokeStyle='#2d4451'; ctx.lineWidth=3; ctx.stroke(); ctx.drawImage(img[w.img],12,y+3,50,50); drawText(String(w.cost),61,y+34,13,'#172a25','center',false); if(cool>0||game.money<w.cost){ ctx.fillStyle='rgba(0,0,0,.55)'; roundRect(8,y,80,62*cool,8); ctx.fill(); } }
+ ctx.fillStyle=game.shovel?'#f3df78':'#e6e2d0'; roundRect(10,496,76,38,7); ctx.fill(); ctx.strokeStyle='#2d4451'; ctx.stroke(); ctx.drawImage(img['shovel.png'],12,492,42,42); drawText('DIG',54,505,14,'#3a211a','left',false);
+ // board tile grid
+ for(let r=0;r<grid.rows;r++){ for(let c=0;c<grid.cols;c++){ ctx.fillStyle=((r+c)%2?(camp.floor2||'#eee5ca'):(camp.floor1||'#f9f0d7')); ctx.fillRect(grid.x+c*grid.cw,grid.y+r*grid.ch,grid.cw,grid.ch); ctx.strokeStyle='rgba(130,105,74,.22)'; ctx.strokeRect(grid.x+c*grid.cw,grid.y+r*grid.ch,grid.cw,grid.ch); } }
+ // sweepers
+ for(let r=0;r<grid.rows;r++){ if(game.sweepers[r]) ctx.drawImage(img['sweeper.png'],8,rowY(r)-28,70,70); }
+ // hover cell
+ if(hovered){ const c=Math.floor((hovered.x-grid.x)/grid.cw), r=Math.floor((hovered.y-grid.y)/grid.ch); if(r>=0&&r<grid.rows&&c>=0&&c<grid.cols){ ctx.fillStyle='rgba(70,220,80,.18)'; ctx.fillRect(grid.x+c*grid.cw,grid.y+r*grid.ch,grid.cw,grid.ch); } }
+ // plants sorted by row col
+ game.plants.slice().sort((a,b)=>a.row-b.row || a.col-b.col).forEach(p=>{ const w=byId(p.id), x=colX(p.col), y=rowY(p.row); ctx.globalAlpha=1; ctx.drawImage(img[w.img],x-39,y-52,78,78); if(p.hp<p.maxHp){ ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(x-28,y+27,56,6); ctx.fillStyle='#49d747'; ctx.fillRect(x-28,y+27,56*clamp(p.hp/p.maxHp,0,1),6); } });
+ // projectiles
+ for(const pr of game.projectiles){ const bob=pr.lob?Math.sin(pr.age*8)*8:0; ctx.save(); if(pr.shot==='pizza_slice.png') { ctx.translate(pr.x,pr.y+bob); ctx.rotate(pr.age*8); ctx.drawImage(img[pr.shot],-18,-18,36,36); } else ctx.drawImage(img[pr.shot],pr.x-16,pr.y-16+bob,32,32); ctx.restore(); }
+ // enemies
+ game.enemies.slice().sort((a,b)=>a.row-b.row || a.x-b.x).forEach(e=>{ const d=enemyDefs[e.type], y=rowY(e.row)+6+Math.sin(e.frame*7)*2; ctx.drawImage(img[d.img],e.x-43,y-67,86,86); ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(e.x-32,y+23,64,6); ctx.fillStyle=e.freeze>0?'#a8edff':e.slow>0?'#ff7bdc':'#ff4a38'; ctx.fillRect(e.x-32,y+23,64*clamp(e.hp/e.maxHp,0,1),6); });
+ // money drops
+ for(const c of game.coins){ ctx.drawImage(img['lunch_money.png'],c.x-20,c.y-20,40,40); }
+ // particles
+ for(const p of game.particles){ ctx.globalAlpha=clamp(p.life,0,1); drawText(p.text,p.x,p.y,17,p.color,'center'); ctx.globalAlpha=1; }
+ if(game.dark>0){ ctx.fillStyle='rgba(0,0,0,'+(0.18+Math.min(.28,game.dark*.08))+')'; ctx.fillRect(grid.x,grid.y,grid.cw*grid.cols,grid.ch*grid.rows); }
+ if(game.ready>0){ ctx.fillStyle='rgba(0,0,0,.22)'; ctx.fillRect(0,0,W,H); drawText(game.message,W/2,H/2-35,62,'#fff7c8','center'); }
+ if(game.win||game.lose){ ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(0,0,W,H); drawPanel(298,176,364,186, game.win?'#386c32':'#783229'); drawText(game.win?'LUNCH SAVED!':'CAFETERIA OVERRUN',480,206,32,'#fff4c8','center'); drawText(game.win?`${camp.short} level ${game.level} complete. Enemies sauced: ${game.killed}`:'The hungry humans got through.',480,258,18,'#fff0c8','center'); drawButton({label:'LEVEL SELECT',x:360,y:305,w:240,h:50,fn:()=>{},opts:{size:22}}); }
+ ctx.restore();
+}
+
+function loading(){
+ bgCafeteria(); ctx.drawImage(img['title_foodfight.png'],90,65,330,150); drawText('Loading...',640,415,28,'#1c1610','center'); loadingSpin+=.08; ctx.save(); ctx.translate(640,330); ctx.rotate(loadingSpin); ctx.drawImage(img['spinner.png'],-36,-36,72,72); ctx.restore();
+ if(loaded>=assetNames.length && state==='loading' && !game){ setTimeout(()=>{ if(state==='loading'&&!game) setState('menu'); }, 250); }
+}
+function loop(now){ const dt=(now-last)/1000; last=now; ctx.clearRect(0,0,W,H); update(dt);
+ if(state==='loading') loading(); else if(state==='menu') menu(); else if(state==='campaigns') campaigns(); else if(state==='levels') levels(); else if(state==='weapons') weaponSelect(); else if(state==='fooddex') fooddex(); else if(state==='enemydex') enemydex(); else if(state==='help') help(); else if(state==='options') options(); else if(state==='play') drawGame();
+ requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
