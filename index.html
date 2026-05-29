@@ -34,13 +34,14 @@ const assetNames = [
  'mint_plant.png','jello_shot.png','bubble_gum_pop.png','rice_crispy_wall.png','corn_cannon.png','noodle_lasher.png','taco_trap.png','cupcake_blaster.png','burger_bunker.png','soda_fizz.png','pickle_pult.png','pizza_disc.png','ice_cream_freeze.png','spaghetti_tangle.png','banana_peel.png','ketchup_sprayer.png','mustard_mortar.png','donut_decoy.png','melon_mortar.png','toast_turret.png','sushi_spinner.png','carrot_spikes.png','nacho_nova.png','waffle_guard.png',
  'geek.png','cheerleader.png','jock.png','basketball_player.png','zombie_human.png','bomb_boy.png','footballer.png','lunch_rusher.png',
  'salad_spinner.png','soup_slinger.png','licorice_whip.png','gravy_boat.png','cheese_wheel.png','pancake_stack.png','popcorn_popper.png','milk_carton_medic.png','funnel_cake_fan.png','frozen_pea_bag.png',
- 'janitor.png','food_critic.png','sugar_kid.png','hungry_uncle.png','delivery_dude.png','early_bird.png','usher.png','hall_monitor.png','circus_clown.png','parka_shopper.png'
+ 'janitor.png','food_critic.png','sugar_kid.png','hungry_uncle.png','delivery_dude.png','early_bird.png','usher.png','hall_monitor.png','circus_clown.png','parka_shopper.png',
+ 'fish_stick_slinger.png','asteroid_meatball.png','cinnamon_roll_blaster.png','wasabi_washer.png','apple_archer.png','pretzel_twister.png','pumpkin_popper.png','juice_boxer.png','rib_rack.png','kelp_snare.png','lifeguard.png','astronaut.png','baker.png','noodle_ninja.png','coupon_mom.png','mall_cop.png','vampire_diner.png','jungle_explorer.png','grill_master.png','scuba_snacker.png','bg_beach.png','bg_space.png','bg_bakery.png','bg_sushi.png','bg_market.png','bg_mall.png','bg_spooky.png','bg_jungle.png','bg_bbq.png','bg_aquarium.png'
 ];
 const img = {};
 let loaded=0;
 assetNames.forEach(name=>{ const im=new Image(); im.onload=()=>loaded++; im.onerror=()=>loaded++; im.src=name; img[name]=im; });
 
-const audioNames = ['music_menu.mp3','music_game.mp3','music_cafeteria.mp3','music_restaurant.mp3','music_candy.mp3','music_thanksgiving.mp3','music_pizza.mp3','music_breakfast.mp3','music_theater.mp3','music_school.mp3','music_carnival.mp3','music_freezer.mp3','sfx_shoot.mp3','sfx_coin.mp3','sfx_plant.mp3','sfx_hit.mp3','sfx_sweeper.mp3','sfx_win.mp3','sfx_lose.mp3','sfx_click.mp3'];
+const audioNames = ['music_menu.mp3','music_game.mp3','music_cafeteria.mp3','music_restaurant.mp3','music_candy.mp3','music_thanksgiving.mp3','music_pizza.mp3','music_breakfast.mp3','music_theater.mp3','music_school.mp3','music_carnival.mp3','music_freezer.mp3','music_beach.mp3','music_space.mp3','music_bakery.mp3','music_sushi.mp3','music_market.mp3','music_mall.mp3','music_spooky.mp3','music_jungle.mp3','music_bbq.mp3','music_aquarium.mp3','sfx_shoot.mp3','sfx_coin.mp3','sfx_plant.mp3','sfx_hit.mp3','sfx_sweeper.mp3','sfx_win.mp3','sfx_lose.mp3','sfx_click.mp3'];
 const sounds = {}; audioNames.forEach(n=>{ const a=new Audio(n); a.preload='auto'; sounds[n]=a; });
 const musicNames = audioNames.filter(n=>n.startsWith('music_'));
 musicNames.forEach(n=>{ sounds[n].loop=true; sounds[n].volume=n==='music_menu.mp3'?.45:.36; });
@@ -83,7 +84,17 @@ const weaponDefs = [
  {id:'popcorn', name:'Popcorn Popper', img:'popcorn_popper.png', cost:175, cool:7, hp:225, dmg:16, rate:1.25, shot:'corn_kernel.png', speed:350, multi:3, splash:28, campaign:'theater', unlock:1, desc:'Theater exclusive. Triple popcorn bursts.'},
  {id:'milk', name:'Milk Carton Medic', img:'milk_carton_medic.png', cost:150, cool:8, hp:240, role:'healer', heal:26, rate:1.4, campaign:'school', unlock:1, desc:'School exclusive. Heals nearby foods instead of shooting.'},
  {id:'funnel', name:'Funnel Cake Fan', img:'funnel_cake_fan.png', cost:200, cool:8, hp:230, dmg:21, rate:1.0, shot:'noodle.png', speed:325, rowSplash:true, spreadRows:true, effect:'knock', campaign:'carnival', unlock:1, desc:'Carnival exclusive. Fans shots across three lanes.'},
- {id:'frozenpeas', name:'Frozen Pea Bag', img:'frozen_pea_bag.png', cost:175, cool:7, hp:230, dmg:22, rate:1.65, shot:'ice_scoop.png', speed:285, rowSplash:true, effect:'freeze', campaign:'freezer', unlock:1, desc:'Freezer exclusive. Cold peas chill nearby enemies.'}
+ {id:'frozenpeas', name:'Frozen Pea Bag', img:'frozen_pea_bag.png', cost:175, cool:7, hp:230, dmg:22, rate:1.65, shot:'ice_scoop.png', speed:285, rowSplash:true, effect:'freeze', campaign:'freezer', unlock:1, desc:'Freezer exclusive. Cold peas chill nearby enemies.'},
+ {id:'fishstick', name:'Fish Stick Slinger', img:'fish_stick_slinger.png', cost:150, cool:6, hp:230, dmg:24, rate:1.2, shot:'pickle.png', speed:340, effect:'knock', campaign:'beach', unlock:1, desc:'Beach exclusive. Crispy shots push beachgoers back.'},
+ {id:'asteroid', name:'Asteroid Meatball', img:'asteroid_meatball.png', cost:225, cool:8, hp:235, dmg:82, rate:2.85, shot:'sauce_drop.png', speed:255, splash:92, lob:true, campaign:'space', unlock:1, desc:'Space exclusive. A heavy splash lobber.'},
+ {id:'cinnamon', name:'Cinnamon Roll Blaster', img:'cinnamon_roll_blaster.png', cost:150, cool:6, hp:230, dmg:28, rate:1.45, shot:'corn_kernel.png', speed:325, pierce:2, effect:'slow', campaign:'bakery', unlock:1, desc:'Bakery exclusive. Sticky spiral shots slow lines.'},
+ {id:'wasabi', name:'Wasabi Washer', img:'wasabi_washer.png', cost:175, cool:7, hp:225, dmg:25, rate:1.05, shot:'sauce_drop.png', speed:310, effect:'burn', rowSplash:true, campaign:'sushi', unlock:1, desc:'Sushi exclusive. Spicy spray burns nearby enemies.'},
+ {id:'apple', name:'Apple Archer', img:'apple_archer.png', cost:125, cool:5, hp:230, dmg:21, rate:.9, shot:'pickle.png', speed:385, effect:'freshMoney', campaign:'market', unlock:1, desc:'Market exclusive. Fast apple seeds can shake out cash.'},
+ {id:'pretzel', name:'Pretzel Twister', img:'pretzel_twister.png', cost:175, cool:7, hp:235, dmg:35, rate:1.6, shot:'noodle.png', speed:345, pierce:3, effect:'stun', campaign:'mall', unlock:1, desc:'Mall exclusive. Twisting pretzels stun and pierce.'},
+ {id:'pumpkin', name:'Pumpkin Popper', img:'pumpkin_popper.png', cost:200, cool:8, hp:235, dmg:62, rate:2.25, shot:'corn_kernel.png', speed:285, splash:78, effect:'slow2', campaign:'spooky', unlock:1, desc:'Spooky exclusive. Splashy pumpkin chunks tangle crowds.'},
+ {id:'juicebox', name:'Juice Boxer', img:'juice_boxer.png', cost:150, cool:5, hp:220, dmg:20, rate:.75, shot:'soda_bubble.png', speed:405, effect:'knock', campaign:'jungle', unlock:1, desc:'Jungle exclusive. Quick juice jabs shove enemies.'},
+ {id:'ribrack', name:'Rib Rack', img:'rib_rack.png', cost:150, cool:7, hp:1180, role:'wall', thorns:18, campaign:'bbq', unlock:1, desc:'BBQ exclusive. A meaty wall that bites back.'},
+ {id:'kelp', name:'Kelp Snare', img:'kelp_snare.png', cost:125, cool:6, hp:210, dmg:13, rate:1.15, shot:'noodle.png', speed:300, effect:'slow2', rowSplash:true, campaign:'aquarium', unlock:1, desc:'Aquarium exclusive. Kelp strands snare nearby enemies.'}
 ];
 const enemyDefs = {
  geek:{name:'Geek', img:'geek.png', hp:86, speed:19, atk:20, worth:6, desc:'Low strength eater with books.'},
@@ -103,7 +114,17 @@ const enemyDefs = {
  usher:{name:'Usher', img:'usher.png', hp:138, speed:22, atk:26, worth:13, behavior:'dim', desc:'Temporarily dims the board.'},
  monitor:{name:'Hall Monitor', img:'hall_monitor.png', hp:170, speed:22, atk:32, worth:15, behavior:'buff', desc:'Hurries nearby classmates forward.'},
  clown:{name:'Circus Clown', img:'circus_clown.png', hp:96, speed:29, atk:20, worth:13, behavior:'split', desc:'Splits into tiny rushers when defeated.'},
- parka:{name:'Parka Shopper', img:'parka_shopper.png', hp:190, speed:19, atk:34, worth:16, behavior:'freezeResist', desc:'Resists freezer weapons.'}
+ parka:{name:'Parka Shopper', img:'parka_shopper.png', hp:190, speed:19, atk:34, worth:16, behavior:'freezeResist', desc:'Resists freezer weapons.'},
+ lifeguard:{name:'Lifeguard', img:'lifeguard.png', hp:150, speed:26, atk:30, worth:14, behavior:'buff', desc:'Whistles nearby snackers forward.'},
+ astronaut:{name:'Astronaut', img:'astronaut.png', hp:165, speed:20, atk:31, worth:15, behavior:'laneSwap', desc:'Moon-walks into another lane once.'},
+ baker:{name:'Baker', img:'baker.png', hp:205, speed:18, atk:38, worth:16, behavior:'armor', desc:'Flour apron reduces projectile damage.'},
+ ninja:{name:'Noodle Ninja', img:'noodle_ninja.png', hp:118, speed:38, atk:25, worth:14, behavior:'jump', desc:'Vaults over the first defender.'},
+ coupon:{name:'Coupon Mom', img:'coupon_mom.png', hp:120, speed:31, atk:22, worth:13, behavior:'steal', desc:'Grabs loose lunch money coupons.'},
+ mallcop:{name:'Mall Cop', img:'mall_cop.png', hp:180, speed:22, atk:34, worth:15, behavior:'buff', desc:'Patrols and speeds up nearby shoppers.'},
+ vampire:{name:'Vampire Diner', img:'vampire_diner.png', hp:155, speed:24, atk:29, worth:16, behavior:'steal', desc:'Steals loose money to heal up.'},
+ explorer:{name:'Jungle Explorer', img:'jungle_explorer.png', hp:145, speed:32, atk:27, worth:14, behavior:'laneSwap', desc:'Ducks through vines into another lane.'},
+ grillmaster:{name:'Grill Master', img:'grill_master.png', hp:220, speed:18, atk:43, worth:18, behavior:'critic', desc:'Burns through the first defender with grill heat.'},
+ scuba:{name:'Scuba Snacker', img:'scuba_snacker.png', hp:175, speed:20, atk:32, worth:16, behavior:'freezeResist', desc:'Wetsuit resists freeze effects.'}
 };
 const campaignDefs = [
  {id:'cafeteria', name:'Cafeteria Chaos', short:'Cafeteria', subtitle:'The original lunch rush.', mechanic:'Mint drops are worth +$5; Janitors sweep traps.', wall:'#0d733d', trim:'#743019', floor1:'#f9f0d7', floor2:'#eee5ca', panel:'#8e3b2d', edge:'#4c1d1b', bonus:['geek'], enemy:'janitor', food:'salad', track:'music_cafeteria.mp3'},
@@ -115,7 +136,17 @@ const campaignDefs = [
  {id:'theater', name:'Movie Theater Munch', short:'Theater', subtitle:'Defend the concession stand.', mechanic:'Popcorn bursts shine, but ushers can dim the board.', wall:'#151b4d', trim:'#561720', floor1:'#d7d0e8', floor2:'#bfb6d2', panel:'#5b2c73', edge:'#211034', bonus:['bomb','baller'], enemy:'usher', food:'popcorn', track:'music_theater.mp3'},
  {id:'school', name:'School Lunch Siege', short:'School Lunch', subtitle:'Cafeteria chaos after the bell.', mechanic:'Milk can heal defenders; hall monitors buff nearby enemies.', wall:'#234f75', trim:'#78431f', floor1:'#e7e2c5', floor2:'#d2cba6', panel:'#315b7e', edge:'#18304a', bonus:['geek','football'], enemy:'monitor', food:'milk', track:'music_school.mp3'},
  {id:'carnival', name:'Carnival Snackdown', short:'Carnival', subtitle:'Midway food fights back.', mechanic:'Fan shots hit three lanes; clowns split when defeated.', wall:'#8f2b24', trim:'#e1b635', floor1:'#ffe2a8', floor2:'#ffd07a', panel:'#a7432c', edge:'#521815', bonus:['rusher','bomb','cheer'], enemy:'clown', food:'funnel', track:'music_carnival.mp3'},
- {id:'freezer', name:'Freezer Aisle Frenzy', short:'Freezer Aisle', subtitle:'Cold aisle, hot tempers.', mechanic:'Most enemies move slower, but parka shoppers resist freeze.', wall:'#236b7f', trim:'#16404a', floor1:'#e8fbff', floor2:'#cdeef7', panel:'#296c83', edge:'#123b4a', bonus:['zombie','football','bomb'], enemy:'parka', food:'frozenpeas', track:'music_freezer.mp3'}
+ {id:'freezer', name:'Freezer Aisle Frenzy', short:'Freezer Aisle', subtitle:'Cold aisle, hot tempers.', mechanic:'Most enemies move slower, but parka shoppers resist freeze.', wall:'#236b7f', trim:'#16404a', floor1:'#e8fbff', floor2:'#cdeef7', panel:'#296c83', edge:'#123b4a', bonus:['zombie','football','bomb'], enemy:'parka', food:'frozenpeas', track:'music_freezer.mp3'},
+ {id:'beach', name:'Beach Boardwalk Brawl', short:'Beach', subtitle:'Defend the fried-food pier.', mechanic:'Knockback foods hit harder; lifeguards whistle nearby humans forward.', wall:'#287daa', trim:'#d6a14a', floor1:'#f7dea2', floor2:'#e8bf72', panel:'#2f8ab1', edge:'#114458', bonus:['rusher','cheer'], enemy:'lifeguard', food:'fishstick', track:'music_beach.mp3', bg:'bg_beach.png'},
+ {id:'space', name:'Space Diner Defense', short:'Space Diner', subtitle:'Zero-gravity hunger attack.', mechanic:'Lobbed foods splash wider; astronauts moon-walk into fresh lanes.', wall:'#15183f', trim:'#35305c', floor1:'#c6c9df', floor2:'#9aa4cf', panel:'#34376b', edge:'#12142e', bonus:['zombie','bomb'], enemy:'astronaut', food:'asteroid', track:'music_space.mp3', bg:'bg_space.png'},
+ {id:'bakery', name:'Bakery Breakout', short:'Bakery', subtitle:'Fresh bread, stale attitudes.', mechanic:'Slow effects linger; bakers shrug off part of projectile damage.', wall:'#8d4f2d', trim:'#5a2f19', floor1:'#fce1bd', floor2:'#e3b985', panel:'#a26437', edge:'#4d2615', bonus:['uncle','geek'], enemy:'baker', food:'cinnamon', track:'music_bakery.mp3', bg:'bg_bakery.png'},
+ {id:'sushi', name:'Sushi Bar Storm', short:'Sushi Bar', subtitle:'Wasabi versus table rushers.', mechanic:'Burn effects tick longer; noodle ninjas vault over one food.', wall:'#1f664e', trim:'#16392e', floor1:'#d6ead9', floor2:'#bdd7c3', panel:'#2e7258', edge:'#123229', bonus:['rusher','cheer'], enemy:'ninja', food:'wasabi', track:'music_sushi.mp3', bg:'bg_sushi.png'},
+ {id:'market', name:'Farmers Market Frenzy', short:'Market', subtitle:'Produce aisle payday.', mechanic:'Fresh shots make more bonus cash; coupon moms steal loose money.', wall:'#337c42', trim:'#845528', floor1:'#ece1ad', floor2:'#cdbd78', panel:'#4e8a3d', edge:'#22451e', bonus:['janitor','earlybird'], enemy:'coupon', food:'apple', track:'music_market.mp3', bg:'bg_market.png'},
+ {id:'mall', name:'Mall Food Court Frenzy', short:'Food Court', subtitle:'Crowds storm the trays.', mechanic:'Stun foods recharge quicker; mall cops speed up nearby shoppers.', wall:'#3a536f', trim:'#263549', floor1:'#e2e4eb', floor2:'#c0c7d5', panel:'#526985', edge:'#1f2d3e', bonus:['delivery','rusher'], enemy:'mallcop', food:'pretzel', track:'music_mall.mp3', bg:'bg_mall.png'},
+ {id:'spooky', name:'Spooky Buffet Bash', short:'Spooky Buffet', subtitle:'The midnight menu fights back.', mechanic:'Splash scares groups; vampire diners heal by stealing cash.', wall:'#2f223e', trim:'#15101f', floor1:'#d1bfa0', floor2:'#a78c73', panel:'#59346a', edge:'#201027', bonus:['zombie','bomb'], enemy:'vampire', food:'pumpkin', track:'music_spooky.mp3', bg:'bg_spooky.png'},
+ {id:'jungle', name:'Jungle Juice Jam', short:'Jungle Juice', subtitle:'Fruit punches through vines.', mechanic:'Knockback lasts longer; explorers dodge into nearby lanes.', wall:'#1d6e33', trim:'#264d21', floor1:'#d4e097', floor2:'#9fc16b', panel:'#3d7b35', edge:'#1d3a19', bonus:['rusher','baller'], enemy:'explorer', food:'juicebox', track:'music_jungle.mp3', bg:'bg_jungle.png'},
+ {id:'bbq', name:'Rooftop BBQ Riot', short:'Rooftop BBQ', subtitle:'Grill smoke and greedy guests.', mechanic:'Thorn walls hit harder; grill masters chunk one defender.', wall:'#743020', trim:'#2c1511', floor1:'#e2aa82', floor2:'#b57e63', panel:'#8e432c', edge:'#3d1712', bonus:['football','uncle'], enemy:'grillmaster', food:'ribrack', track:'music_bbq.mp3', bg:'bg_bbq.png'},
+ {id:'aquarium', name:'Aquarium Cafe Crash', short:'Aquarium', subtitle:'Sea snacks hold the line.', mechanic:'Slow effects spread wider; scuba snackers resist freeze.', wall:'#196d86', trim:'#0d3c4e', floor1:'#d5f0f4', floor2:'#a4d9e6', panel:'#287b95', edge:'#103f52', bonus:['parka','zombie'], enemy:'scuba', food:'kelp', track:'music_aquarium.mp3', bg:'bg_aquarium.png'}
 ];
 function currentCampaignDef(){ return campaignDefs[selectedCampaign] || campaignDefs[0]; }
 function splitLabel(text){ const words=text.split(' '); if(words.length<3) return [text]; const mid=Math.ceil(words.length/2); return [words.slice(0,mid).join(' '), words.slice(mid).join(' ')]; }
@@ -125,6 +156,7 @@ let state='loading';
 let buttons=[];
 let selectedCampaign=0;
 let selectedLevel=1;
+let campaignPage=0;
 let chosenIds=['mint','jello','wall','toast','gum','corn'];
 let currentTip='';
 let game=null;
@@ -136,7 +168,8 @@ const campaignSaveKey='foodfight_html5_campaign_progress_v2';
 const oldProgress=Number(localStorage.getItem(oldSaveKey)||1);
 let campaignProgress;
 try{ campaignProgress=JSON.parse(localStorage.getItem(campaignSaveKey)||'null'); }catch(e){ campaignProgress=null; }
-if(!Array.isArray(campaignProgress) || campaignProgress.length!==campaignDefs.length){ campaignProgress=campaignDefs.map((_,i)=>i===0?clamp(oldProgress||1,1,10):1); }
+if(!Array.isArray(campaignProgress)) campaignProgress=[];
+campaignProgress=campaignDefs.map((_,i)=> i<campaignProgress.length ? clamp(Number(campaignProgress[i]||1),1,10) : (i===0?clamp(oldProgress||1,1,10):1));
 function saveCampaignProgress(){ localStorage.setItem(campaignSaveKey, JSON.stringify(campaignProgress)); }
 function progressForCampaign(i=selectedCampaign){ return clamp(Number(campaignProgress[i]||1),1,10); }
 
@@ -163,6 +196,7 @@ function drawButton(b){
  drawText(b.label,b.x+b.w/2,b.y+b.h/2-(b.opts.size||24)/2,b.opts.size||24,'#fff2cf','center'); ctx.restore();
 }
 function bgCafeteria(theme=campaignDefs[0]){
+ if(theme && theme.bg && img[theme.bg] && img[theme.bg].complete && img[theme.bg].naturalWidth){ ctx.drawImage(img[theme.bg],0,0,W,H); return; }
  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,theme.wall||'#0e2e38'); g.addColorStop(.44,theme.wall||'#102d35'); g.addColorStop(.45,theme.floor1||'#eee8ce'); g.addColorStop(1,theme.floor2||'#d8ceb0'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
  ctx.fillStyle='rgba(255,255,255,.13)'; ctx.fillRect(0,236,W,8);
  // tile floor
@@ -192,16 +226,22 @@ function menu(){
  addButton('INVITE',684,316,180,58,()=>{currentTip='Invite bonus: +25 lunch money is included in spirit only. No real IAP here.'; setState('help');});
  addButton('HELP',684,398,91,50,()=>{currentTip='Plant mint for money, defend each lane, and let sweepers save you once per row.'; setState('help');},{small:true,size:20});
  addButton('OPTIONS',792,398,91,50,()=>setState('options'),{small:true,size:20});
- drawText('v1.3 slower waves + faster mint',820,495,16,'#401b15','center',false);
+ drawText('v1.4 page 2 campaigns',820,495,16,'#401b15','center',false);
  buttons.forEach(drawButton);
 }
 
 function campaigns(){
  resetButtons();
- bgCafeteria(campaignDefs[0]); ctx.drawImage(img['title_foodfight.png'],35,18,265,122); drawPanel(70,100,820,360,'#743628'); drawText('CHOOSE A CAMPAIGN',480,118,30,'#fff2cf','center');
- const cols=5,bw=146,bh=112,sx=98,sy=170;
- campaignDefs.forEach((c,i)=>{ const x=sx+(i%cols)*154, y=sy+Math.floor(i/cols)*128; drawPanel(x,y,bw,bh,c.panel,c.edge); ctx.fillStyle=c.wall; roundRect(x+12,y+12,bw-24,28,7); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.stroke(); const label=splitLabel(c.name); label.forEach((line,j)=>drawText(line,x+bw/2,y+47+j*16,14,'#fff6d4','center')); drawText(`Level ${progressForCampaign(i)}/10`,x+bw/2,y+86,14,'#ffdf64','center'); addButton('',x,y,bw,bh,()=>{ selectedCampaign=i; selectedLevel=progressForCampaign(i); setState('levels'); },{blank:true}); });
- addButton('BACK',32,468,105,45,()=>setState('menu'),{size:20}); buttons.forEach(b=>{ if(!b.opts.blank) drawButton(b); });
+ const perPage=10, totalPages=Math.ceil(campaignDefs.length/perPage); campaignPage=clamp(campaignPage,0,totalPages-1);
+ const pageStart=campaignPage*perPage, pageCampaigns=campaignDefs.slice(pageStart,pageStart+perPage);
+ bgCafeteria(pageCampaigns[0]||campaignDefs[0]); ctx.drawImage(img['title_foodfight.png'],35,18,265,122); drawPanel(70,100,820,360,'#743628');
+ drawText('CHOOSE A CAMPAIGN',480,118,30,'#fff2cf','center'); drawText(`PAGE ${campaignPage+1}/${totalPages}`,480,150,16,'#ffe6a3','center');
+ const cols=5,bw=146,bh=112,sx=98,sy=184;
+ pageCampaigns.forEach((c,slot)=>{ const i=pageStart+slot; const x=sx+(slot%cols)*154, y=sy+Math.floor(slot/cols)*128; drawPanel(x,y,bw,bh,c.panel,c.edge); ctx.fillStyle=c.wall; roundRect(x+12,y+12,bw-24,28,7); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.stroke(); const label=splitLabel(c.name); label.forEach((line,j)=>drawText(line,x+bw/2,y+47+j*16,14,'#fff6d4','center')); drawText(`Level ${progressForCampaign(i)}/10`,x+bw/2,y+86,14,'#ffdf64','center'); addButton('',x,y,bw,bh,()=>{ selectedCampaign=i; selectedLevel=progressForCampaign(i); setState('levels'); },{blank:true}); });
+ addButton('BACK',32,468,105,45,()=>setState('menu'),{size:20});
+ if(campaignPage>0) addButton('PAGE 1',185,468,120,45,()=>{campaignPage--; setState('campaigns');},{size:20});
+ if(campaignPage<totalPages-1) addButton('PAGE 2',655,468,120,45,()=>{campaignPage++; setState('campaigns');},{size:20});
+ buttons.forEach(b=>{ if(!b.opts.blank) drawButton(b); });
 }
 function levels(){
  resetButtons();
@@ -238,7 +278,7 @@ function fooddex(){
 function enemydex(){
  resetButtons();
  bgCafeteria(); drawPanel(32,24,896,462,'#8d291e'); drawText('ENEMIES',480,38,28,'#fff2cf','center');
- const list=Object.entries(enemyDefs); const sx=62,sy=78,cw=135,ch=114,gx=144,gy=124; list.forEach(([id,e],i)=>{ const x=sx+(i%6)*gx,y=sy+Math.floor(i/6)*gy; drawPanel(x,y,cw,ch,'#22323d','#381a15'); ctx.fillStyle='rgba(255,255,190,.15)'; ctx.beginPath(); ctx.ellipse(x+67,y+49,50,28,0,0,Math.PI*2); ctx.fill(); ctx.drawImage(img[e.img],x+25,y+2,78,78); drawText(e.name,x+8,y+77,12,'#fff2cf'); drawText(`Atk ${e.atk}  HP ${e.hp}`,x+8,y+94,10,'#ffe1b0'); });
+ const list=Object.entries(enemyDefs); const sx=53,sy=78,cw=116,ch=88,gx=124,gy=96; list.forEach(([id,e],i)=>{ const x=sx+(i%7)*gx,y=sy+Math.floor(i/7)*gy; drawPanel(x,y,cw,ch,'#22323d','#381a15'); ctx.fillStyle='rgba(255,255,190,.15)'; ctx.beginPath(); ctx.ellipse(x+58,y+36,42,22,0,0,Math.PI*2); ctx.fill(); ctx.drawImage(img[e.img],x+31,y+1,58,58); drawText(e.name,x+8,y+58,10,'#fff2cf'); drawText(`Atk ${e.atk}  HP ${e.hp}`,x+8,y+73,9,'#ffe1b0'); });
  addButton('BACK',35,490,110,40,()=>setState('menu'),{size:20}); buttons.forEach(drawButton);
 }
 function help(){
@@ -279,23 +319,23 @@ function buildWave(level,campaignIndex=0){
  const pool=['geek']; if(level>=2) pool.push('cheer','baller'); if(level>=3) pool.push('jock'); if(level>=5) pool.push('zombie'); if(level>=6) pool.push('bomb'); if(level>=8) pool.push('rusher'); if(level>=9) pool.push('football');
  if(camp.enemy && enemyDefs[camp.enemy]){ pool.push(camp.enemy); if(level>=4) pool.push(camp.enemy); }
  (camp.bonus||[]).forEach(t=>{ if(enemyDefs[t] && !pool.includes(t)) pool.push(t); pool.push(t); });
- const wave=[]; const count=Math.round(5+level*2.25+campaignIndex*.18); let t=0;
- // Slower, more readable waves: larger gaps between humans, especially in early levels.
- const minGap=Math.max(3.25,5.45-level*.055-campaignIndex*.004);
- const maxGap=Math.max(4.8,8.35-level*.045-campaignIndex*.004);
+ const wave=[]; const count=Math.round(4+level*1.85+Math.min(campaignIndex,9)*.08); let t=0;
+ // Even slower, more readable waves across every campaign and page.
+ const minGap=Math.max(4.25,6.4-level*.035);
+ const maxGap=Math.max(6.2,9.8-level*.03);
  for(let i=0;i<count;i++){ t += rnd(minGap,maxGap); let type=pool[Math.floor(Math.random()*pool.length)]; if(i%10===8 && camp.enemy) type=camp.enemy; if(i%14===11 && level>=6) type=(camp.enemy||'bomb'); wave.push({time:t,type}); }
- for(let i=0;i<Math.min(level,5);i++) wave.push({time:t+11+i*3.0,type:pool[Math.floor(Math.random()*pool.length)]});
+ for(let i=0;i<Math.min(level,5);i++) wave.push({time:t+14+i*3.8,type:pool[Math.floor(Math.random()*pool.length)]});
  return wave.sort((a,b)=>a.time-b.time);
 }
 function spawnEnemy(type){
- const d=enemyDefs[type] || enemyDefs.geek; const camp=campaignDefs[game.campaign] || campaignDefs[0]; const row=Math.floor(Math.random()*grid.rows); const scale=1+game.level*.028+game.campaign*.01;
+ const d=enemyDefs[type] || enemyDefs.geek; const camp=campaignDefs[game.campaign] || campaignDefs[0]; const row=Math.floor(Math.random()*grid.rows); const scale=1+game.level*.026+game.campaign*.004;
  let speed=d.speed*(1+game.level*.012); if(camp.id==='freezer' && d.behavior!=='freezeResist') speed*=.88;
  game.enemies.push({type,row,x:W+40,y:rowY(row)+10,hp:d.hp*scale,maxHp:d.hp*scale,speed,atk:d.atk*scale,cool:0,stun:0,slow:0,freeze:0,jumped:false,bleed:0,burn:0,boost:0,frame:Math.random()*10});
 }
 function addParticle(x,y,text,color='#fff'){ game.particles.push({x,y,text,color,life:1,vy:-35}); }
 function dropMoney(x,y,amount){ game.coins.push({x,y,amount,life:8,vy:0,spin:0}); }
 function plantAt(row,col){ return game.plants.find(p=>p.row===row&&p.col===col); }
-function addPlant(w,row,col){ const camp=campaignDefs[game.campaign] || campaignDefs[0]; let hp=w.hp; if(camp.id==='thanksgiving' && w.role==='wall') hp*=1.2; game.plants.push({id:w.id,row,col,hp,maxHp:hp,last:0,money:0,anim:0}); game.money-=w.cost; game.cooldowns[w.id]=w.cool; sfx('sfx_plant.mp3',.7); }
+function addPlant(w,row,col){ const camp=campaignDefs[game.campaign] || campaignDefs[0]; let hp=w.hp; if(camp.id==='thanksgiving' && w.role==='wall') hp*=1.2; game.plants.push({id:w.id,row,col,hp,maxHp:hp,last:0,money:0,anim:0}); game.money-=w.cost; let cool=w.cool; if(camp.id==='mall' && w.effect==='stun') cool*=.82; game.cooldowns[w.id]=cool; sfx('sfx_plant.mp3',.7); }
 function gameClick(p){
  if(game.win||game.lose){ if(p.x>360&&p.x<600&&p.y>300&&p.y<355){ setState('levels'); playMusic('menu'); } return; }
  if(p.x>800 && p.y<66){ setState('menu'); playMusic('menu'); return; }
@@ -378,11 +418,16 @@ function update(dt){
 }
 function damageEnemy(e, dmg, effect, x, y){
  if(e.dead) return; const d=enemyDefs[e.type] || enemyDefs.geek; const camp=campaignDefs[game.campaign] || campaignDefs[0];
+ if(camp.id==='space' && effect===null) dmg*=1.08;
+ if(camp.id==='bakery' && (effect==='slow'||effect==='slow2')) dmg*=1.05;
+ if(camp.id==='sushi' && effect==='burn') dmg*=1.12;
+ if(camp.id==='bbq' && effect==='burn') dmg*=1.18;
+ if(camp.id==='aquarium' && (effect==='slow'||effect==='slow2')) dmg*=1.08;
  if(d.behavior==='armor') dmg*=.72;
  if(d.behavior==='freezeResist' && effect==='freeze'){ effect='slow'; dmg*=.9; }
  if(d.behavior==='sugarRush' && !e.rushed){ e.rushed=true; e.speed*=1.32; addParticle(e.x,rowY(e.row)-44,'sugar rush!','#ff94ed'); }
  e.hp-=dmg;
- if(effect==='slow') e.slow=Math.max(e.slow,camp.id==='candy'?4.4:3.4); if(effect==='slow2') e.slow=Math.max(e.slow,camp.id==='candy'?6.4:5.0); if(effect==='stun') e.stun=Math.max(e.stun,.55); if(effect==='freeze') e.freeze=Math.max(e.freeze,camp.id==='freezer'?2.25:1.7); if(effect==='knock'){ e.x+=30; e.stun=Math.max(e.stun,.25); } if(effect==='slip'){ e.stun=Math.max(e.stun,2.2); e.slow=Math.max(e.slow,4); } if(effect==='bleed') e.bleed=Math.max(e.bleed,4); if(effect==='burn') e.burn=Math.max(e.burn,3.2); if(effect==='freshMoney' && Math.random()<.28) dropMoney(x,y,3);
+ if(effect==='slow') e.slow=Math.max(e.slow,(camp.id==='candy'||camp.id==='bakery')?4.6:3.4); if(effect==='slow2') e.slow=Math.max(e.slow,(camp.id==='candy'||camp.id==='aquarium')?6.6:5.0); if(effect==='stun') e.stun=Math.max(e.stun,camp.id==='mall'?.8:.55); if(effect==='freeze') e.freeze=Math.max(e.freeze,camp.id==='freezer'?2.25:1.7); if(effect==='knock'){ e.x+=camp.id==='jungle'||camp.id==='beach'?42:30; e.stun=Math.max(e.stun,.25); } if(effect==='slip'){ e.stun=Math.max(e.stun,2.2); e.slow=Math.max(e.slow,4); } if(effect==='bleed') e.bleed=Math.max(e.bleed,4); if(effect==='burn') e.burn=Math.max(e.burn,(camp.id==='sushi'||camp.id==='bbq')?4.0:3.2); if(effect==='freshMoney' && Math.random()<(camp.id==='market'?.38:.28)) dropMoney(x,y,camp.id==='market'?5:3);
  if(e.hp<=0){ e.dead=true; if(d.behavior==='split' && !e.splitDone){ e.splitDone=true; for(const off of [-1,1]){ const nr=clamp(e.row+off,0,grid.rows-1); game.enemies.push({type:'geek',row:nr,x:e.x+off*12,y:rowY(nr)+10,hp:46,maxHp:46,speed:46,atk:13,cool:0,stun:0,slow:0,freeze:0,jumped:false,bleed:0,burn:0,boost:0,frame:Math.random()*10}); } addParticle(e.x,rowY(e.row)-55,'split!','#fff27a'); }
    addParticle(e.x,rowY(e.row)-40,'yum!','#eaff8f'); let worth=d.worth||6; dropMoney(e.x,rowY(e.row)-20,worth); if(camp.id==='restaurant' && game.killed%5===4) dropMoney(e.x+18,rowY(e.row)-28,15); game.killed++; }
 } 
@@ -392,7 +437,7 @@ function drawGame(){
  ctx.save(); if(game.shake>0) ctx.translate(rnd(-5,5),rnd(-5,5));
  // play bg
  const camp=campaignDefs[game.campaign] || campaignDefs[0];
- ctx.fillStyle=camp.floor1||'#efe7cf'; ctx.fillRect(0,0,W,H);
+ if(camp.bg && img[camp.bg] && img[camp.bg].complete && img[camp.bg].naturalWidth) ctx.drawImage(img[camp.bg],0,0,W,H); else { ctx.fillStyle=camp.floor1||'#efe7cf'; ctx.fillRect(0,0,W,H); }
  ctx.fillStyle=camp.wall||'#0d733d'; ctx.fillRect(0,0,W,66);
  ctx.fillStyle=camp.trim||'#743019'; ctx.fillRect(0,0,W,22);
  ctx.fillStyle='#e6bb55'; ctx.fillRect(455,4,300,18); ctx.fillStyle='#964f2d'; ctx.fillRect(475,8,260,10); ctx.fillStyle='#f6df80'; ctx.fillRect(482,8,(game.spawned/game.wave.length)*246,10);
