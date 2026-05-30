@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 <title>Food Fight: Back for Seconds</title>
 <style>
-  html, body { margin:0; height:100%; overflow:hidden; background:#071b22; font-family: "Trebuchet MS", "Comic Sans MS", system-ui, sans-serif; }
-  #wrap { height:100%; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at center,#163544 0,#06151b 72%); }
-  canvas { width:min(100vw, 177.78vh); height:min(56.25vw, 100vh); image-rendering:auto; touch-action:none; box-shadow:0 0 0 5px #021015, 0 16px 60px #000b; background:#0d2730; }
-  #hint { position:fixed; left:10px; bottom:8px; color:#e6f3c8; opacity:.7; font-size:12px; pointer-events:none; text-shadow:1px 1px 2px #000; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#041018; font-family:"Trebuchet MS", "Comic Sans MS", "Arial Rounded MT Bold", system-ui, sans-serif; }
+  #wrap { height:100%; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at center,#0e4c63 0,#062636 42%,#041018 90%); }
+  canvas { width:min(100vw, 150vh); height:min(66.667vw, 100vh); image-rendering:auto; touch-action:none; box-shadow:0 0 0 5px #04131a, 0 0 0 11px #0b4153, 0 18px 70px #000d; background:#0d2730; }
+  #hint { display:none; }
 </style>
 </head>
 <body>
-<div id="wrap"><canvas id="game" width="960" height="540" aria-label="Food Fight HTML5 game"></canvas></div>
+<div id="wrap"><canvas id="game" width="960" height="640" aria-label="Food Fight HTML5 game"></canvas></div>
 <div id="hint">Tip: click a food card, then a cafeteria tile. Use the shovel to remove food. Audio starts after your first click.</div>
 <script>
 (() => {
@@ -21,8 +21,8 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = true;
 
-const W=960,H=540;
-const grid = { x:96, y:86, cols:9, rows:5, cw:80, ch:80 };
+const W=960,H=640;
+const grid = { x:104, y:88, cols:9, rows:5, cw:84, ch:100 };
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const rowY=r=>grid.y+r*grid.ch+grid.ch*0.5;
@@ -294,6 +294,7 @@ let last=performance.now();
 let loadingSpin=0;
 let bookPage=0;
 let enemyPage=0;
+let selectedEnemyId='geek';
 let upgradePage=0;
 let synergyPage=0;
 const oldSaveKey='foodfight_html5_progress_v1';
@@ -346,12 +347,14 @@ function safeDraw(name,x,y,w,h){
 }
 function drawText(text,x,y,size=20,color='#fff',align='left',stroke=true){
  ctx.save();
- ctx.font=`900 ${size}px Trebuchet MS, Comic Sans MS, Arial Black, sans-serif`;
+ const fontStack='Trebuchet MS, Comic Sans MS, Arial Black, sans-serif';
+ ctx.font=`900 ${size}px ${fontStack}`;
  ctx.textAlign=align; ctx.textBaseline='top'; ctx.lineJoin='round'; ctx.miterLimit=2;
  if(stroke){
-   ctx.lineWidth=Math.max(4,size/5.2); ctx.strokeStyle='rgba(47,18,14,.92)'; ctx.strokeText(text,x+1,y+1);
-   ctx.lineWidth=Math.max(2,size/10); ctx.strokeStyle='rgba(255,245,190,.22)'; ctx.strokeText(text,x,y-1);
+   ctx.lineWidth=Math.max(4,size/4.8); ctx.strokeStyle='rgba(74,21,12,.96)'; ctx.strokeText(text,x+1,y+1);
+   ctx.lineWidth=Math.max(1.5,size/11); ctx.strokeStyle='rgba(255,249,189,.35)'; ctx.strokeText(text,x,y-1);
  }
+ ctx.shadowColor='rgba(0,0,0,.18)'; ctx.shadowOffsetX=1; ctx.shadowOffsetY=2; ctx.shadowBlur=0;
  ctx.fillStyle=color; ctx.fillText(text,x,y); ctx.restore();
 }
 function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
@@ -384,10 +387,18 @@ function drawButton(b){
  if(b.opts && b.opts.blank) return;
  if(b.opts && b.opts.rack){ drawCabinetButton(b); return; }
  const hot=hovered&&inRect(hovered,b); ctx.save();
- const fill=b.opts.small?'#c9782b': hot?'#c66f3d':'#9b4a32';
- drawPanel(b.x,b.y,b.w,b.h,fill,b.opts.small?'#5a2419':'#4b1b18');
- if(hot){ ctx.strokeStyle='#fff18c'; ctx.lineWidth=3; panelPath(b.x+2,b.y+2,b.w-4,b.h-4,10); ctx.stroke(); }
- drawText(b.label,b.x+b.w/2,b.y+b.h/2-(b.opts.size||24)/2,b.opts.size||24,'#fff2cf','center');
+ const x=b.x,y=b.y,w=b.w,h=b.h;
+ if(b.opts && b.opts.red){
+   drawPanel(x,y,w,h,hot?'#b95832':'#8d3f22','#421512');
+   drawText(b.label,x+w/2,y+h/2-(b.opts.size||24)/2,b.opts.size||24,'#fff2cf','center');
+   ctx.restore(); return;
+ }
+ ctx.fillStyle='rgba(0,0,0,.25)'; panelPath(x-4,y+4,w+8,h+6,12); ctx.fill();
+ const edge=ctx.createLinearGradient(x,y,x,y+h); edge.addColorStop(0,'#ffe06a'); edge.addColorStop(.55,'#b8681e'); edge.addColorStop(1,'#6b2a10'); ctx.fillStyle=edge; panelPath(x,y,w,h,12); ctx.fill();
+ const g=ctx.createLinearGradient(x+2,y+3,x+2,y+h-4); g.addColorStop(0,hot?'#fff6a6':'#ffe06e'); g.addColorStop(.45,hot?'#f2b844':'#e99328'); g.addColorStop(1,hot?'#c06c20':'#9d4d18'); ctx.fillStyle=g; panelPath(x+5,y+5,w-10,h-10,9); ctx.fill();
+ ctx.strokeStyle='#602312'; ctx.lineWidth=4; panelPath(x+2,y+2,w-4,h-4,10); ctx.stroke();
+ ctx.strokeStyle='rgba(255,255,210,.45)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x+18,y+10); ctx.quadraticCurveTo(x+w/2,y+2,x+w-18,y+10); ctx.stroke();
+ drawText(b.label,x+w/2,y+h/2-(b.opts.size||24)/2,b.opts.size||24,'#fff7cf','center');
  ctx.restore();
 }
 function drawCabinetButton(b){
@@ -401,6 +412,56 @@ function drawCabinetButton(b){
  roundRect(x+14,y+9,16,h-18,8); ctx.fill(); ctx.strokeStyle='#4e1d12'; ctx.lineWidth=2; ctx.stroke();
  drawText(b.label,x+w/2+10,y+h/2-(b.opts.size||24)/2,b.opts.size||24,'#fff4dc','center');
  ctx.restore();
+}
+
+function drawCardFrame(x,y,w,h,selected=false,locked=false){
+ ctx.save();
+ ctx.fillStyle='rgba(0,0,0,.35)'; roundRect(x+3,y+4,w,h,9); ctx.fill();
+ const outer=ctx.createLinearGradient(x,y,x,y+h); outer.addColorStop(0,selected?'#b8e88a':'#44a7c2'); outer.addColorStop(.5,selected?'#5cbe37':'#176b87'); outer.addColorStop(1,selected?'#2d7a27':'#0b3447'); ctx.fillStyle=outer; roundRect(x,y,w,h,10); ctx.fill();
+ ctx.strokeStyle=selected?'#fff16a':'#062639'; ctx.lineWidth=3.5; ctx.stroke();
+ const inner=ctx.createLinearGradient(x+5,y+5,x+5,y+h-5); inner.addColorStop(0,locked?'#617184':'#e4f8f4'); inner.addColorStop(.52,locked?'#283743':'#8ecde2'); inner.addColorStop(1,locked?'#13222c':'#235b74'); ctx.fillStyle=inner; roundRect(x+7,y+7,w-14,h-14,7); ctx.fill();
+ ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=2; roundRect(x+9,y+9,w-18,h-18,6); ctx.stroke();
+ ctx.restore();
+}
+function drawCostBadge(amount,x,y,w=50,h=19){
+ ctx.save();
+ ctx.fillStyle='rgba(255,249,196,.93)'; roundRect(x,y,w,h,6); ctx.fill();
+ ctx.strokeStyle='#5e2812'; ctx.lineWidth=2; ctx.stroke();
+ drawText(String(amount),x+w/2,y+2,12,'#3b2413','center',false);
+ ctx.restore();
+}
+function drawLockSticker(x,y,s=36){
+ ctx.save();
+ ctx.fillStyle='rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(x+s/2,y+s/2,s*.47,s*.39,-.25,0,Math.PI*2); ctx.fill();
+ const g=ctx.createLinearGradient(x,y,x+s,y+s); g.addColorStop(0,'#bd2b22'); g.addColorStop(1,'#54140f'); ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(x+s/2,y+s/2,s*.44,s*.36,-.15,0,Math.PI*2); ctx.fill();
+ ctx.strokeStyle='#2f100c'; ctx.lineWidth=3; ctx.stroke();
+ safeDraw('lock.png',x+s*.22,y+s*.16,s*.56,s*.56);
+ ctx.restore();
+}
+function drawReferenceFloor(){
+ const wall=ctx.createLinearGradient(0,0,0,210); wall.addColorStop(0,'#2a4e47'); wall.addColorStop(1,'#162c2c'); ctx.fillStyle=wall; ctx.fillRect(0,0,W,230);
+ ctx.fillStyle='rgba(0,0,0,.20)'; ctx.fillRect(0,218,W,11);
+ const floor=ctx.createLinearGradient(0,230,0,H); floor.addColorStop(0,'#fff3ce'); floor.addColorStop(1,'#d4c29c'); ctx.fillStyle=floor; ctx.fillRect(0,230,W,H-230);
+ for(let y=230;y<H;y+=70){ ctx.strokeStyle='rgba(109,90,66,.26)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y+10); ctx.stroke(); }
+ for(let x=-80;x<W+140;x+=92){ ctx.strokeStyle='rgba(109,90,66,.22)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x,230); ctx.lineTo(x+66,H); ctx.stroke(); }
+}
+function drawRightSnackers(){
+ const crowd=[['geek',818,182],['cheer',875,292],['jock',785,370],['bomb',912,214],['rusher',850,420]];
+ crowd.forEach(([id,x,y],i)=>{ const e=enemyDefs[id]||enemyDefs.geek; ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(x,y+42,42,12,0,0,Math.PI*2); ctx.fill(); safeDraw(e.img,x-42,y-56,84,112); });
+}
+function drawBlueTopCard(x,y,w,h,imgName,label,cost,selected=false,locked=false){
+ drawCardFrame(x,y,w,h,selected,locked);
+ ctx.save(); if(locked) ctx.globalAlpha=.58;
+ const icon=Math.min(50,h-12);
+ safeDraw(imgName,x+7,y+(h-icon)/2,icon,icon);
+ if(cost!=null) drawCostBadge(cost,x+w-42,y+5,36,16);
+ if(label){
+   const short=label.length>12 ? label.split(' ').map(v=>v[0]).join('').slice(0,8) || label.slice(0,8) : label;
+   drawText(short,x+w/2,y+h-14,8,'#fff6d8','center');
+ }
+ ctx.restore();
+ if(locked) drawLockSticker(x+w/2-18,y+h/2-20,40);
+ if(selected){ ctx.save(); ctx.fillStyle='#2abd3f'; ctx.beginPath(); ctx.moveTo(x+w-25,y-2); ctx.lineTo(x+w+3,y-2); ctx.lineTo(x+w+3,y+26); ctx.closePath(); ctx.fill(); ctx.strokeStyle='#0d4a18'; ctx.lineWidth=2; ctx.stroke(); drawText('✓',x+w-9,y+1,16,'#fff8ae','center'); ctx.restore(); }
 }
 function bgCafeteria(theme=campaignDefs[0]){
  if(theme && theme.bg && img[theme.bg] && img[theme.bg].complete && img[theme.bg].naturalWidth && state!=='menu' && state!=='loading'){
@@ -612,14 +673,34 @@ function levels(){
 function unlockedForLevel(){ return weaponDefs.filter(w=>w.unlock<=selectedLevel); }
 function weaponSelect(){
  resetButtons();
- const camp=currentCampaignDef(); bgCafeteria(camp); drawPanel(54,42,852,438,camp.panel,camp.edge); drawText('CHOOSE YOUR WEAPONS',480,55,26,'#fff2cf','center'); drawText(`${camp.name} - Level ${selectedLevel}. Pick up to 6. Campaign food: ${byId(camp.food).name}.`,480,88,14,'#ffe1a5','center');
+ const camp=currentCampaignDef();
+ drawReferenceFloor();
+ drawRightSnackers();
+ // left chosen stack, like the real weapon-pick screen.
+ ctx.save();
+ const chosenList=chosenIds.map(byId).filter(Boolean);
+ for(let i=0;i<6;i++){
+   const w=chosenList[i]; const y=54+i*72;
+   drawCardFrame(7,y,88,62,w,false);
+   if(w){ safeDraw(w.img,14,y+5,50,50); drawCostBadge(foodStats(w).cost,53,y+36,34,16); }
+ }
+ ctx.restore();
+ drawPanel(130,34,650,422,'#8b3320','#42120d');
+ drawText('CHOOSE YOUR WEAPONS',455,43,25,'#fff4c8','center');
+ drawText(`${camp.short} - Level ${selectedLevel}`,455,77,15,'#ffe7a6','center',false);
  const list=weaponDefs.filter(w=>!w.campaign || w.campaign===camp.id);
  chosenIds=chosenIds.filter(id=>list.some(w=>w.id===id && w.unlock<=selectedLevel)).slice(0,6);
- const sx=84, sy=112, cw=96, ch=64, gapX=106, gapY=70;
- list.forEach((w,i)=>{ const x=sx+(i%8)*gapX, y=sy+Math.floor(i/8)*gapY; const lock=w.unlock>selectedLevel; ctx.save(); ctx.globalAlpha=lock ? 0.38 : 1; drawPanel(x,y,cw,ch, chosenIds.includes(w.id)?'#366830':(w.campaign?'#604070':'#2b4250'),'#20302b'); safeDraw(w.img,x+5,y+4,42,42); drawText('$'+foodStats(w).cost,x+50,y+7,12,'#fff1a2','left'); drawText(w.name,x+cw/2,y+45,10,'#fff2d5','center'); ctx.restore(); if(lock){ safeDraw('lock.png',x+30,y+9,30,30); drawText('L'+w.unlock,x+46,y+36,10,'#fff','center'); } else { addButton('',x,y,cw,ch,()=>toggleWeapon(w.id),{blank:true}); } });
- addButton('START FIGHT',352,486,170,42,()=>{ if(chosenIds.length===0) chosenIds=['mint','jello']; startLoading(); },{size:20});
- addButton('BACK',35,486,100,42,()=>setState('levels'),{size:20});
- drawText(`${chosenIds.length}/6 selected   Bank $${Math.floor(bankCoins)}`,610,493,17,'#fff0bf');
+ const sx=150, sy=94, cw=108, ch=54, gapX=122, gapY=60;
+ list.slice(0,30).forEach((w,i)=>{
+   const x=sx+(i%5)*gapX, y=sy+Math.floor(i/5)*gapY; const lock=w.unlock>selectedLevel;
+   drawBlueTopCard(x,y,cw,ch,w.img,w.name,foodStats(w).cost,chosenIds.includes(w.id),lock);
+   if(!lock) addButton('',x,y,cw,ch,()=>toggleWeapon(w.id),{blank:true});
+ });
+ // A little status strip so the user knows there are more foods on later levels without destroying the screenshot look.
+ ctx.save(); ctx.fillStyle='rgba(70,17,12,.42)'; roundRect(181,501,368,22,9); ctx.fill(); ctx.restore();
+ drawText(`${chosenIds.length}/6 selected   Bank $${Math.floor(bankCoins)}`,365,503,14,'#fff0bf','center',false);
+ addButton('QUIT',57,488,122,42,()=>setState('levels'),{size:22});
+ addButton('START FIGHT',344,488,196,42,()=>{ if(chosenIds.length===0) chosenIds=['mint','jello']; startLoading(); },{size:21});
  buttons.forEach(b=>{ if(!b.opts.blank) drawButton(b); });
 }
 function toggleWeapon(id){ const i=chosenIds.indexOf(id); if(i>=0) chosenIds.splice(i,1); else { if(chosenIds.length>=6) chosenIds.shift(); chosenIds.push(id); } sfx('sfx_click.mp3'); }
@@ -640,14 +721,40 @@ function fooddex(){
 }
 function enemydex(){
  resetButtons();
- bgCafeteria(); drawPanel(32,24,896,462,'#8d291e'); drawText('LUNCHBOX BOOK - PEOPLE',480,38,26,'#fff2cf','center');
- const entries=Object.entries(enemyDefs), per=21, total=Math.ceil(entries.length/per); enemyPage=clamp(enemyPage,0,total-1); const list=entries.slice(enemyPage*per,enemyPage*per+per);
- const sx=53,sy=78,cw=116,ch=88,gx=124,gy=96; list.forEach(([id,e],i)=>{ const x=sx+(i%7)*gx,y=sy+Math.floor(i/7)*gy; drawPanel(x,y,cw,ch,'#22323d','#381a15'); ctx.fillStyle='rgba(255,255,190,.15)'; ctx.beginPath(); ctx.ellipse(x+58,y+36,42,22,0,0,Math.PI*2); ctx.fill(); safeDraw(e.img,x+31,y+1,58,58); drawText(e.name,x+8,y+56,9,'#fff2cf'); drawText(`Atk ${Math.round(e.atk)} HP ${Math.round(e.hp)}`,x+8,y+72,8,'#ffe1b0'); });
- addButton('BACK',35,490,90,40,()=>setState('menu'),{size:18});
- if(enemyPage>0) addButton('PREV',155,490,90,40,()=>{enemyPage--; setState('enemydex');},{size:18});
- if(enemyPage<total-1) addButton('NEXT',255,490,90,40,()=>{enemyPage++; setState('enemydex');},{size:18});
- addButton('FOODS',385,490,100,40,()=>{bookPage=0; setState('fooddex');},{size:18});
- drawText(`Page ${enemyPage+1}/${total}`,850,498,16,'#fff0bf','center'); buttons.forEach(drawButton);
+ drawReferenceFloor();
+ const entries=Object.entries(enemyDefs);
+ const per=20,total=Math.ceil(entries.length/per); enemyPage=clamp(enemyPage,0,total-1);
+ const list=entries.slice(enemyPage*per,enemyPage*per+per);
+ if(!enemyDefs[selectedEnemyId] || !list.some(([id])=>id===selectedEnemyId)) selectedEnemyId=list[0] ? list[0][0] : 'geek';
+ drawPanel(18,14,918,500,'#8b3320','#42120d');
+ drawText('ENEMIES',271,25,25,'#fff4c8','center');
+ const sx=42, sy=58, cw=88, ch=62, gapX=104, gapY=70;
+ list.forEach(([id,e],i)=>{
+   const x=sx+(i%4)*gapX, y=sy+Math.floor(i/4)*gapY;
+   drawBlueTopCard(x,y,cw,ch,e.img,'',null,selectedEnemyId===id,false);
+   addButton('',x,y,cw,ch,()=>{ selectedEnemyId=id; setState('enemydex'); },{blank:true});
+ });
+ // right preview window, based on the reference enemy browser.
+ ctx.save();
+ ctx.fillStyle='rgba(17,31,29,.96)'; roundRect(533,51,350,205,4); ctx.fill();
+ ctx.strokeStyle='#33120e'; ctx.lineWidth=5; ctx.stroke();
+ const light=ctx.createRadialGradient(706,168,12,706,168,230); light.addColorStop(0,'rgba(255,248,214,.72)'); light.addColorStop(.34,'rgba(247,230,183,.28)'); light.addColorStop(1,'rgba(0,0,0,.04)'); ctx.fillStyle=light; ctx.beginPath(); ctx.ellipse(706,176,155,52,0,0,Math.PI*2); ctx.fill();
+ const previewEnemy=enemyDefs[selectedEnemyId]||enemyDefs.geek;
+ ctx.fillStyle='rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(708,224,54,13,0,0,Math.PI*2); ctx.fill();
+ safeDraw(previewEnemy.img,652,74,112,158);
+ ctx.restore();
+ const ed=enemyDefs[selectedEnemyId]||enemyDefs.geek;
+ drawText('Name: '+ed.name,535,276,21,'#fff5cf','left');
+ drawText('Attack: Eater',535,307,19,'#fff5cf','left');
+ drawText('Strength: '+(ed.hp<120?'Low':ed.hp<190?'Medium':'High'),535,336,19,'#fff5cf','left');
+ const desc=ed.desc || 'He does not just have an appetite for knowledge, but also for food...';
+ const words=('He does not just have an appetite for knowledge, but also for food... '+desc).split(' '); let line='', yy=378;
+ words.forEach(word=>{ const test=line?line+' '+word:word; if(test.length>38){ drawText(line,535,yy,16,'#fff0c8','left'); yy+=24; line=word; } else line=test; }); if(line) drawText(line,535,yy,16,'#fff0c8','left');
+ if(enemyPage>0) addButton('‹',25,455,58,42,()=>{enemyPage--; selectedEnemyId=(Object.keys(enemyDefs)[enemyPage*per])||'geek'; setState('enemydex');},{size:28});
+ if(enemyPage<total-1) addButton('›',398,455,58,42,()=>{enemyPage++; selectedEnemyId=(Object.keys(enemyDefs)[enemyPage*per])||'geek'; setState('enemydex');},{size:28});
+ addButton('BACK',31,488,112,42,()=>setState('menu'),{size:22});
+ drawText(`Page ${enemyPage+1}/${total}`,250,497,16,'#fff0bf','center',false);
+ buttons.forEach(b=>{ if(!b.opts.blank) drawButton(b); });
 }
 function upgrades(){
  resetButtons();
@@ -734,10 +841,10 @@ function gameClick(p){
  for(let i=game.coins.length-1;i>=0;i--){ const c=game.coins[i]; if(Math.hypot(p.x-c.x,p.y-c.y)<34){ game.money+=c.amount; game.bankEarned=(game.bankEarned||0)+c.amount; awardBank(c.amount); addParticle(c.x,c.y,'+$'+c.amount,'#fff06a'); game.coins.splice(i,1); sfx('sfx_coin.mp3',.9); return; } }
  // seedbank / conveyor
  const cardList = game.minigame==='conveyor' ? game.conveyor : game.chosen;
- for(let i=0;i<cardList.length;i++){ const y=74+i*72; if(p.x>=7&&p.x<=88&&p.y>=y&&p.y<=y+62){ const w=cardList[i]; const sw=foodStats(w); if(game.minigame==='conveyor'){ game.selected=w.id; game.conveyor.splice(i,1); game.shovel=false; sfx('sfx_click.mp3'); return; }
+ for(let i=0;i<cardList.length;i++){ const y=6+i*84; if(p.x>=7&&p.x<=95&&p.y>=y&&p.y<=y+76){ const w=cardList[i]; const sw=foodStats(w); if(game.minigame==='conveyor'){ game.selected=w.id; game.conveyor.splice(i,1); game.shovel=false; sfx('sfx_click.mp3'); return; }
      if(game.cooldowns[w.id]<=0 && game.money>=sw.cost){ game.selected=w.id; game.shovel=false; } else { addParticle(100,y+30, game.money<sw.cost?'Need money':'Cooling','#ffdf74'); } return; } }
  // shovel
- if(p.x>=10&&p.x<=86&&p.y>=496&&p.y<=534){ game.shovel=!game.shovel; game.selected=null; sfx('sfx_click.mp3'); return; }
+ if(p.x>=10&&p.x<=92&&p.y>=590&&p.y<=630){ game.shovel=!game.shovel; game.selected=null; sfx('sfx_click.mp3'); return; }
  // board
  const col=Math.floor((p.x-grid.x)/grid.cw), row=Math.floor((p.y-grid.y)/grid.ch);
  if(row>=0&&row<grid.rows&&col>=0&&col<grid.cols){
@@ -865,55 +972,51 @@ function drawSplat(x,y,color='#30b13f',scale=1,alpha=.45){
 }
 function drawTopHud(camp){
  ctx.save();
- const wood=ctx.createLinearGradient(0,0,0,68); wood.addColorStop(0,'#8e3f20'); wood.addColorStop(.5,'#5a2417'); wood.addColorStop(1,'#7b351c'); ctx.fillStyle=wood; ctx.fillRect(0,0,W,68);
- ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(0,63,W,6);
- // money counter, shovel marker, and progress sandwich
- drawPanel(113,5,118,39,'#177c3b','#0a3c20'); safeDraw('lunch_money.png',119,5,35,35); drawText(String(Math.floor(game.money)).padStart(4,'0'),176,11,24,'#ffe861','center');
- drawPanel(245,5,80,39,game.shovel?'#b94b2d':'#233b50','#10212d'); safeDraw('shovel.png',250,4,36,36); drawText(game.shovel?'ON':'DIG',298,15,14,'#d9f5ff','center',false);
- // sandwich wave bar
- ctx.fillStyle='rgba(0,0,0,.38)'; roundRect(438,6,298,36,18); ctx.fill();
- ctx.fillStyle='#e2a655'; roundRect(445,10,284,25,14); ctx.fill();
- ctx.fillStyle='#76b444'; roundRect(450,22,274,9,5); ctx.fill();
- ctx.fillStyle='#9b4b2f'; roundRect(454,14,266,8,4); ctx.fill();
+ const bar=ctx.createLinearGradient(0,0,0,68); bar.addColorStop(0,'#a44922'); bar.addColorStop(.25,'#7d2b19'); bar.addColorStop(.7,'#551914'); bar.addColorStop(1,'#8b351e'); ctx.fillStyle=bar; ctx.fillRect(0,0,W,68);
+ ctx.fillStyle='rgba(255,209,114,.16)'; ctx.fillRect(0,4,W,7);
+ ctx.fillStyle='rgba(0,0,0,.48)'; ctx.fillRect(0,63,W,6);
+ drawPanel(106,4,118,42,'#1b8841','#082f18'); safeDraw('lunch_money.png',112,7,34,34); drawText(String(Math.floor(game.money)).padStart(4,'0'),172,12,24,'#ffe861','center');
+ drawPanel(235,5,82,40,game.shovel?'#d3a640':'#18405a','#0d2230'); safeDraw('shovel.png',241,5,36,36); drawText(game.shovel?'ON':'DIG',289,16,13,'#e8fbff','center',false);
+ // sandwich progress meter
+ ctx.fillStyle='rgba(0,0,0,.28)'; roundRect(438,6,286,34,17); ctx.fill();
+ ctx.fillStyle='#f0d3a0'; roundRect(446,11,270,21,13); ctx.fill();
+ ctx.fillStyle='#8e3e21'; roundRect(451,19,260,8,4); ctx.fill();
+ ctx.fillStyle='#6fb03a'; roundRect(451,25,260,7,4); ctx.fill();
  const prog=game.wave.length?clamp(game.spawned/game.wave.length,0,1):0;
- ctx.fillStyle='#f0d476'; roundRect(455,13,266*prog,18,8); ctx.fill();
- ctx.fillStyle='#c43132'; ctx.beginPath(); ctx.arc(500,8,6,0,Math.PI*2); ctx.arc(698,8,6,0,Math.PI*2); ctx.fill();
- drawText(game.minigame?(game.minigameShort||game.minigameName):camp.short+' '+game.level,585,39,14,'#fff4ce','center');
- // sauce meter and menu tab
- drawPanel(635,27,156,34,game.sauce>=100?'#8b5723':'#58211e','#2b0e0d'); ctx.fillStyle='#3b1110'; roundRect(650,38,128,12,6); ctx.fill(); ctx.fillStyle=game.sauce>=100?'#fff26c':'#e65b28'; roundRect(650,38,128*clamp((game.sauce||0)/100,0,1),12,6); ctx.fill(); drawText(game.sauce>=100?'SAUCE!':'SAUCE',714,30,15,'#fff6d2','center');
- drawPanel(815,4,124,49,'#8d3f22','#421512'); drawText('MENU',877,15,25,'#fff2cf','center');
+ ctx.fillStyle='#fff5b3'; roundRect(451,13,260*prog,13,7); ctx.fill();
+ ctx.fillStyle='#c63830'; [505,672].forEach(x=>{ctx.beginPath(); ctx.arc(x,8,6,0,Math.PI*2); ctx.fill();});
+ drawText(game.minigame?(game.minigameShort||game.minigameName):camp.short+' '+game.level,584,41,14,'#fff4ce','center');
+ drawPanel(638,28,154,32,game.sauce>=100?'#8b5723':'#58211e','#2b0e0d'); ctx.fillStyle='#3b1110'; roundRect(652,39,126,10,6); ctx.fill(); ctx.fillStyle=game.sauce>=100?'#fff26c':'#e65b28'; roundRect(652,39,126*clamp((game.sauce||0)/100,0,1),10,6); ctx.fill(); drawText(game.sauce>=100?'SAUCE!':'SAUCE',714,30,14,'#fff6d2','center');
+ drawPanel(816,5,124,48,'#8d3f22','#421512'); drawText('MENU',878,15,25,'#fff2cf','center');
  ctx.restore();
 }
 function drawSeedCard(w,i){
  const y=74+i*72, selected=game.selected===w.id, cool=game.minigame==='conveyor'?0:clamp(game.cooldowns[w.id]/(w.cool||5),0,1), locked=!game.minigame&&game.money<w.cost;
  ctx.save();
- ctx.fillStyle='rgba(0,0,0,.35)'; roundRect(6,y+4,84,62,11); ctx.fill();
- const card=ctx.createLinearGradient(8,y,88,y+62); card.addColorStop(0,selected?'#8bd0e3':'#1c5269'); card.addColorStop(1,selected?'#dff7bd':'#102f3f'); ctx.fillStyle=card; roundRect(8,y,80,62,9); ctx.fill();
- ctx.strokeStyle=selected?'#fff06d':'#062431'; ctx.lineWidth=3; ctx.stroke();
- ctx.fillStyle='rgba(255,255,255,.12)'; roundRect(12,y+5,70,17,7); ctx.fill();
- safeDraw(w.img,13,y+6,47,47);
- ctx.fillStyle='rgba(255,255,235,.9)'; roundRect(52,y+34,31,17,6); ctx.fill();
- drawText(game.minigame==='conveyor'?'FREE':String(w.cost),67,y+35,11,'#172a25','center',false);
- drawText(game.minigame==='conveyor'?'BELT':'Lv'+upgradeLevel(w.id),67,y+49,9,'#fff8c4','center');
- if(cool>0||locked){ ctx.fillStyle='rgba(10,10,10,.58)'; roundRect(8,y,80,62*(cool||1),9); ctx.fill(); if(locked) drawText('$',48,y+18,27,'#ffeb6a','center'); }
+ drawCardFrame(7,y,88,62,selected,locked);
+ safeDraw(w.img,12,y+5,52,52);
+ drawCostBadge(game.minigame==='conveyor'?'FREE':w.cost,53,y+36,34,16);
+ drawText(game.minigame==='conveyor'?'BELT':'Lv'+upgradeLevel(w.id),67,y+51,9,'#fff8c4','center');
+ if(cool>0||locked){ ctx.fillStyle='rgba(8,19,25,.62)'; roundRect(7,y,88,62*(cool||1),9); ctx.fill(); if(locked) drawText('$',51,y+17,27,'#ffeb6a','center'); }
  ctx.restore();
 }
 function drawGame(){
  ctx.save(); if(game.shake>0) ctx.translate(rnd(-5,5),rnd(-5,5));
  const camp=campaignDefs[game.campaign] || campaignDefs[0];
- // play background, made closer to the original cafeteria shots: wall/floor first, then a clean tile board.
- if(camp.bg && img[camp.bg] && img[camp.bg].complete && img[camp.bg].naturalWidth){ safeDraw(camp.bg,0,0,W,H); ctx.fillStyle='rgba(245,235,205,.35)'; ctx.fillRect(grid.x,grid.y,grid.cw*grid.cols,grid.ch*grid.rows); }
- else { bgCafeteria(camp); }
+ // Screenshot-style cafeteria floor first, then the clean defense grid.
+ if(camp.id==='cafeteria' || !camp.bg){ drawReferenceFloor(); }
+ else { safeDraw(camp.bg,0,0,W,H); ctx.fillStyle='rgba(255,242,205,.28)'; ctx.fillRect(0,68,W,H-68); }
  drawTopHud(camp);
  // left seedbank wall
- const side=ctx.createLinearGradient(0,66,96,66); side.addColorStop(0,'#5b2a1a'); side.addColorStop(.2,'#7f3d22'); side.addColorStop(.22,'#102f3c'); side.addColorStop(1,'#071d27'); ctx.fillStyle=side; ctx.fillRect(0,66,96,H-66);
+ const side=ctx.createLinearGradient(0,66,96,66); side.addColorStop(0,'#7b3820'); side.addColorStop(.18,'#4b190f'); side.addColorStop(.22,'#0e5266'); side.addColorStop(1,'#072838'); ctx.fillStyle=side; ctx.fillRect(0,66,96,H-66);
  ctx.strokeStyle='#3b1412'; ctx.lineWidth=5; ctx.strokeRect(0,66,96,H-66);
+ ctx.strokeStyle='rgba(255,230,160,.18)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(92,68); ctx.lineTo(92,H); ctx.stroke();
  // board shadow and tile grid
- ctx.fillStyle='rgba(0,0,0,.22)'; roundRect(grid.x-7,grid.y-6,grid.cw*grid.cols+14,grid.ch*grid.rows+14,6); ctx.fill();
+ ctx.fillStyle='rgba(0,0,0,.23)'; roundRect(grid.x-7,grid.y-6,grid.cw*grid.cols+14,grid.ch*grid.rows+14,6); ctx.fill();
  for(let r=0;r<grid.rows;r++){
    for(let c=0;c<grid.cols;c++){
      const x=grid.x+c*grid.cw,y=grid.y+r*grid.ch;
-     const base=((r+c)%2?(camp.floor2||'#eee5ca'):(camp.floor1||'#fbf1d6'));
+     const base=((r+c)%2?(camp.floor2||'#d9c8a1'):(camp.floor1||'#fff2c8'));
      const tg=ctx.createLinearGradient(x,y,x,y+grid.ch); tg.addColorStop(0,lighten(base,.08)); tg.addColorStop(1,darken(base,.06)); ctx.fillStyle=tg; ctx.fillRect(x,y,grid.cw,grid.ch);
      ctx.strokeStyle='rgba(114,88,55,.26)'; ctx.lineWidth=2; ctx.strokeRect(x,y,grid.cw,grid.ch);
      ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.beginPath(); ctx.moveTo(x+2,y+2); ctx.lineTo(x+grid.cw-2,y+2); ctx.stroke();
@@ -970,9 +1073,207 @@ function drawGame(){
 }
 
 function loading(){
- bgCafeteria(); safeDraw('title_foodfight.png',90,65,330,150); drawText('Loading...',640,415,28,'#1c1610','center'); loadingSpin+=.08; ctx.save(); ctx.translate(640,330); ctx.rotate(loadingSpin); safeDraw('spinner.png',-36,-36,72,72); ctx.restore();
+ drawReferenceFloor();
+ safeDraw('title_foodfight.png',42,28,355,190);
+ ctx.save();
+ // table and food pile
+ ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(424,421,210,35,0,0,Math.PI*2); ctx.fill();
+ ctx.fillStyle='#8d4a20'; roundRect(305,318,244,68,12); ctx.fill(); ctx.strokeStyle='#3a180b'; ctx.lineWidth=5; ctx.stroke();
+ ctx.fillStyle='#6f3518'; ctx.fillRect(329,382,24,82); ctx.fillRect(500,382,24,82);
+ safeDraw('jello_shot.png',210,262,160,160);
+ safeDraw('spaghetti_tangle.png',350,263,110,110);
+ safeDraw('burger_bunker.png',412,269,105,105);
+ safeDraw('pizza_disc.png',285,269,96,96);
+ // attackers on the right
+ [['jock',650,238],['bomb',748,278],['geek',573,270],['cheer',831,330]].forEach(([id,x,y])=>{ const e=enemyDefs[id]||enemyDefs.geek; ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(x,y+78,54,15,0,0,Math.PI*2); ctx.fill(); safeDraw(e.img,x-60,y-80,120,170); });
+ ctx.restore();
+ drawText('Loading...',792,466,25,'#1d1610','center');
+ loadingSpin+=.08; ctx.save(); ctx.translate(862,488); ctx.rotate(loadingSpin); safeDraw('spinner.png',-18,-18,36,36); ctx.restore();
  if(loaded>=assetNames.length && state==='loading' && !game){ setTimeout(()=>{ if(state==='loading'&&!game) setState('menu'); }, 250); }
 }
+
+
+/* -------------------------------------------------------------------------
+   Screenshot-style UI patch: every screen is still drawn in code on canvas.
+   The coordinates are based on the 480x320 reference shots, scaled 2x.
+------------------------------------------------------------------------- */
+function ffJitterPathRect(x,y,w,h,r=10,amp=3){
+ ctx.beginPath();
+ ctx.moveTo(x+r,y+rnd(-amp,amp));
+ ctx.lineTo(x+w-r+rnd(-amp,amp),y+rnd(-amp,amp));
+ ctx.quadraticCurveTo(x+w+rnd(-amp,amp),y+rnd(-amp,amp),x+w+rnd(-amp,amp),y+r+rnd(-amp,amp));
+ ctx.lineTo(x+w+rnd(-amp,amp),y+h-r+rnd(-amp,amp));
+ ctx.quadraticCurveTo(x+w+rnd(-amp,amp),y+h+rnd(-amp,amp),x+w-r+rnd(-amp,amp),y+h+rnd(-amp,amp));
+ ctx.lineTo(x+r+rnd(-amp,amp),y+h+rnd(-amp,amp));
+ ctx.quadraticCurveTo(x+rnd(-amp,amp),y+h+rnd(-amp,amp),x+rnd(-amp,amp),y+h-r+rnd(-amp,amp));
+ ctx.lineTo(x+rnd(-amp,amp),y+r+rnd(-amp,amp));
+ ctx.quadraticCurveTo(x+rnd(-amp,amp),y+rnd(-amp,amp),x+r+rnd(-amp,amp),y+rnd(-amp,amp));
+ ctx.closePath();
+}
+function ffBrushBlob(x,y,w,h,fill,alpha=.14){
+ ctx.save(); ctx.globalAlpha=alpha; ctx.fillStyle=fill; ffJitterPathRect(x,y,w,h,22,5); ctx.fill(); ctx.restore();
+}
+function drawPanel(x,y,w,h,fill='#8e3b2d',edge='#481b1a'){
+ ctx.save();
+ ctx.fillStyle='rgba(0,0,0,.42)'; ffJitterPathRect(x-8,y+7,w+18,h+12,18,2.5); ctx.fill();
+ ctx.fillStyle=edge; ffJitterPathRect(x-6,y-6,w+12,h+12,17,2.2); ctx.fill();
+ const g=ctx.createLinearGradient(x,y,x,y+h); g.addColorStop(0,lighten(fill,.18)); g.addColorStop(.22,fill); g.addColorStop(.72,darken(fill,.10)); g.addColorStop(1,darken(fill,.24)); ctx.fillStyle=g; ffJitterPathRect(x,y,w,h,14,2.2); ctx.fill();
+ ctx.lineWidth=4; ctx.strokeStyle='rgba(45,10,8,.95)'; ctx.stroke();
+ ctx.strokeStyle='rgba(255,238,160,.22)'; ctx.lineWidth=2; ffJitterPathRect(x+6,y+6,w-12,h-12,11,1.5); ctx.stroke();
+ ffBrushBlob(x+w*.08,y+h*.10,w*.40,h*.14,'#fff3b3',.08); ffBrushBlob(x+w*.58,y+h*.68,w*.32,h*.18,'#3b0c08',.10);
+ ctx.restore();
+}
+function drawText(text,x,y,size=20,color='#fff',align='left',stroke=true){
+ ctx.save();
+ const fontStack='"Trebuchet MS", "Comic Sans MS", "Arial Rounded MT Bold", sans-serif';
+ ctx.font=`900 ${size}px ${fontStack}`; ctx.textAlign=align; ctx.textBaseline='top'; ctx.lineJoin='round'; ctx.miterLimit=2;
+ if(stroke){ ctx.lineWidth=Math.max(4,size/4.5); ctx.strokeStyle='rgba(91,24,11,.98)'; ctx.strokeText(text,x+1,y+1); ctx.lineWidth=Math.max(1,size/12); ctx.strokeStyle='rgba(255,246,176,.38)'; ctx.strokeText(text,x,y-1); }
+ ctx.fillStyle=color; ctx.shadowColor='rgba(0,0,0,.18)'; ctx.shadowOffsetX=1; ctx.shadowOffsetY=2; ctx.shadowBlur=0; ctx.fillText(text,x,y); ctx.restore();
+}
+function drawReferenceFloor(){
+ const wall=ctx.createLinearGradient(0,0,0,142); wall.addColorStop(0,'#243d38'); wall.addColorStop(.56,'#182f31'); wall.addColorStop(1,'#102427'); ctx.fillStyle=wall; ctx.fillRect(0,0,W,150);
+ ctx.fillStyle='rgba(5,18,17,.44)'; ctx.fillRect(0,138,W,14); ctx.fillStyle='rgba(255,243,194,.18)'; ctx.fillRect(0,151,W,5);
+ const floor=ctx.createLinearGradient(0,150,0,H); floor.addColorStop(0,'#fff3d2'); floor.addColorStop(.42,'#eadfbd'); floor.addColorStop(1,'#c9b995'); ctx.fillStyle=floor; ctx.fillRect(0,150,W,H-150);
+ for(let y=150;y<H+80;y+=88){ ctx.strokeStyle='rgba(113,91,63,.30)'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y+22); ctx.stroke(); }
+ for(let x=-80;x<W+160;x+=92){ ctx.strokeStyle='rgba(113,91,63,.26)'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(x,150); ctx.lineTo(x+112,H); ctx.stroke(); }
+ // back wall details, like the screenshots' cafeteria clutter
+ ctx.save(); ctx.globalAlpha=.38; ctx.fillStyle='#36584d'; for(let i=0;i<6;i++){ roundRect(108+i*126,22,70,32,8); ctx.fill(); } ctx.restore();
+ ctx.save(); ctx.globalAlpha=.15; for(let i=0;i<20;i++){ ffBrushBlob((i*97)%W,170+(i*43)%(H-190),60+(i%4)*25,16+(i%3)*10,i%2?'#fff7c8':'#876e48',.10); } ctx.restore();
+}
+function drawTileFloorForGame(camp){
+ if(camp && camp.bg && img[camp.bg] && img[camp.bg].complete && img[camp.bg].naturalWidth && camp.id!=='cafeteria'){ safeDraw(camp.bg,0,0,W,H); ctx.fillStyle='rgba(255,242,205,.32)'; ctx.fillRect(0,76,W,H-76); } else drawReferenceFloor();
+ ctx.save();
+ ctx.fillStyle='rgba(255,255,235,.20)'; ctx.fillRect(grid.x,grid.y,grid.cw*grid.cols,grid.ch*grid.rows);
+ ctx.fillStyle='rgba(0,0,0,.22)'; roundRect(grid.x-8,grid.y-7,grid.cw*grid.cols+17,grid.ch*grid.rows+15,6); ctx.fill();
+ for(let r=0;r<grid.rows;r++){
+   for(let c=0;c<grid.cols;c++){
+     const x=grid.x+c*grid.cw,y=grid.y+r*grid.ch;
+     let base=(r+c)%2?(camp.floor2||'#d6c79c'):(camp.floor1||'#fff0c8');
+     const tg=ctx.createLinearGradient(x,y,x,y+grid.ch); tg.addColorStop(0,lighten(base,.12)); tg.addColorStop(.55,base); tg.addColorStop(1,darken(base,.08));
+     ctx.fillStyle=tg; ctx.fillRect(x,y,grid.cw,grid.ch);
+     ctx.strokeStyle='rgba(111,87,54,.33)'; ctx.lineWidth=2; ctx.strokeRect(x,y,grid.cw,grid.ch);
+     ctx.strokeStyle='rgba(255,255,255,.24)'; ctx.beginPath(); ctx.moveTo(x+3,y+3); ctx.lineTo(x+grid.cw-3,y+3); ctx.stroke();
+   }
+ }
+ ctx.restore();
+}
+function drawCardFrame(x,y,w,h,selected=false,locked=false){
+ ctx.save();
+ ctx.fillStyle='rgba(0,0,0,.38)'; roundRect(x+4,y+5,w,h,10); ctx.fill();
+ const outer=ctx.createLinearGradient(x,y,x,y+h); outer.addColorStop(0,selected?'#c9ff7d':'#3db8d9'); outer.addColorStop(.16,selected?'#74d83e':'#0d6e91'); outer.addColorStop(1,selected?'#1d781d':'#092a3a'); ctx.fillStyle=outer; roundRect(x,y,w,h,10); ctx.fill();
+ ctx.strokeStyle=selected?'#fff25e':'#061f2e'; ctx.lineWidth=4; ctx.stroke();
+ const inner=ctx.createLinearGradient(x+6,y+7,x+6,y+h-8); inner.addColorStop(0,locked?'#61717b':'#ecfbef'); inner.addColorStop(.45,locked?'#2e3b44':'#8ed6e7'); inner.addColorStop(1,locked?'#142029':'#1f5a72'); ctx.fillStyle=inner; roundRect(x+8,y+8,w-16,h-16,7); ctx.fill();
+ ctx.strokeStyle='rgba(255,255,255,.28)'; ctx.lineWidth=2; roundRect(x+10,y+10,w-20,h-20,6); ctx.stroke();
+ ctx.restore();
+}
+function drawBlueTopCard(x,y,w,h,imgName,label,cost,selected=false,locked=false){
+ drawCardFrame(x,y,w,h,selected,locked);
+ ctx.save(); if(locked) ctx.globalAlpha=.54;
+ const icon=Math.min(h-12,54); safeDraw(imgName,x+8,y+(h-icon)/2,icon,icon);
+ if(cost!=null) drawCostBadge(cost,x+w-45,y+5,38,17);
+ if(label){ const short=label.length>13 ? label.split(' ').map(v=>v[0]).join('').slice(0,8) || label.slice(0,8) : label; drawText(short,x+w/2,y+h-15,9,'#fff7d9','center'); }
+ ctx.restore();
+ if(locked) drawLockSticker(x+w/2-18,y+h/2-20,40);
+ if(selected){ ctx.save(); ctx.fillStyle='#21be3e'; ctx.beginPath(); ctx.moveTo(x+w-27,y-2); ctx.lineTo(x+w+4,y-2); ctx.lineTo(x+w+4,y+28); ctx.closePath(); ctx.fill(); ctx.strokeStyle='#0d4a18'; ctx.lineWidth=2; ctx.stroke(); drawText('✓',x+w-10,y+0,17,'#fff8ae','center'); ctx.restore(); }
+}
+function drawCostBadge(amount,x,y,w=50,h=19){
+ ctx.save(); const g=ctx.createLinearGradient(x,y,x,y+h); g.addColorStop(0,'#fffbd0'); g.addColorStop(1,'#d9b45b'); ctx.fillStyle=g; roundRect(x,y,w,h,6); ctx.fill(); ctx.strokeStyle='#562110'; ctx.lineWidth=2.2; ctx.stroke(); drawText(String(amount),x+w/2,y+2,12,'#3b2413','center',false); ctx.restore();
+}
+function drawTopHud(camp){
+ ctx.save();
+ const bar=ctx.createLinearGradient(0,0,0,78); bar.addColorStop(0,'#b24f24'); bar.addColorStop(.2,'#822b17'); bar.addColorStop(.76,'#4e1710'); bar.addColorStop(1,'#6f2919'); ctx.fillStyle=bar; ctx.fillRect(0,0,W,76);
+ ctx.fillStyle='rgba(255,214,120,.14)'; ctx.fillRect(0,5,W,7); ctx.fillStyle='rgba(0,0,0,.48)'; ctx.fillRect(0,74,W,7);
+ // money tray exactly where the top of the reference screen keeps it
+ drawPanel(106,4,124,44,'#1c8f3d','#062c16'); safeDraw('lunch_money.png',112,8,34,34); drawText(String(Math.floor(game.money)).padStart(4,'0'),177,12,25,'#ffe85d','center');
+ drawPanel(238,5,84,42,game.shovel?'#d7af3c':'#17445f','#0b2737'); safeDraw('shovel.png',244,5,36,36); drawText(game.shovel?'ON':'DIG',294,16,13,'#e8fbff','center',false);
+ ctx.fillStyle='rgba(0,0,0,.30)'; roundRect(438,6,286,36,18); ctx.fill();
+ ctx.fillStyle='#f3d08f'; roundRect(446,11,270,22,12); ctx.fill(); ctx.fillStyle='#9a4823'; roundRect(451,19,260,8,4); ctx.fill(); ctx.fillStyle='#61a735'; roundRect(451,26,260,7,4); ctx.fill(); ctx.fillStyle='#ffd94d'; ctx.fillRect(446,15,270,3);
+ const prog=game.wave.length?clamp(game.spawned/game.wave.length,0,1):0; ctx.fillStyle='#fff4a2'; roundRect(451,13,260*prog,12,7); ctx.fill();
+ ctx.fillStyle='#c63c2b'; [507,674].forEach(x=>{ctx.beginPath(); ctx.arc(x,7,6,0,Math.PI*2); ctx.fill();});
+ drawText(game.minigame?(game.minigameShort||game.minigameName):camp.short+' '+game.level,584,42,14,'#fff4ce','center');
+ drawPanel(638,29,154,33,game.sauce>=100?'#946324':'#5a211d','#2b0d0c'); ctx.fillStyle='#35100d'; roundRect(652,40,126,11,6); ctx.fill(); ctx.fillStyle=game.sauce>=100?'#fff25c':'#e75727'; roundRect(652,40,126*clamp((game.sauce||0)/100,0,1),11,6); ctx.fill(); drawText(game.sauce>=100?'SAUCE!':'SAUCE',714,31,14,'#fff6d2','center');
+ drawPanel(816,5,124,50,'#8e3d21','#421410'); drawText('MENU',878,15,26,'#fff2cf','center');
+ ctx.restore();
+}
+function drawSeedCard(w,i){
+ const y=6+i*84, selected=game.selected===w.id, cool=game.minigame==='conveyor'?0:clamp(game.cooldowns[w.id]/(w.cool||5),0,1), locked=!game.minigame&&game.money<w.cost;
+ ctx.save(); drawCardFrame(7,y,88,76,selected,locked); safeDraw(w.img,13,y+7,58,58); drawCostBadge(game.minigame==='conveyor'?'FREE':w.cost,51,y+49,36,17); drawText(game.minigame==='conveyor'?'BELT':'Lv'+upgradeLevel(w.id),67,y+65,9,'#fff8c4','center');
+ if(cool>0||locked){ ctx.fillStyle='rgba(8,19,25,.62)'; roundRect(7,y,88,76*(cool||1),9); ctx.fill(); if(locked) drawText('$',51,y+23,29,'#ffeb6a','center'); }
+ ctx.restore();
+}
+function drawLeftLunchThrowers(){
+ ctx.save();
+ // red pipes/sweepers, copied as code shapes so the left side reads like the real shots
+ for(let r=0;r<grid.rows;r++){
+   const y=rowY(r);
+   ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(52,y+32,36,9,0,0,Math.PI*2); ctx.fill();
+   if(game.sweepers[r]){ safeDraw('sweeper.png',12,y-36,72,82); }
+ }
+ ctx.restore();
+}
+function drawCafeteriaDecor(){
+ ctx.save();
+ ctx.globalAlpha=.28; ctx.fillStyle='#e25a2a'; roundRect(890,120,76,110,18); ctx.fill(); ctx.fillStyle='#f5e7bf'; ctx.beginPath(); ctx.arc(910,104,22,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#224b76'; ctx.fillRect(898,125,22,92);
+ ctx.globalAlpha=.25; ctx.fillStyle='#3c852e'; for(let i=0;i<7;i++){ ctx.beginPath(); ctx.ellipse(865+i*13,584-i*7,38,10,-.3,0,Math.PI*2); ctx.fill(); }
+ ctx.restore();
+}
+function drawGame(){
+ ctx.save(); if(game.shake>0) ctx.translate(rnd(-5,5),rnd(-5,5));
+ const camp=campaignDefs[game.campaign] || campaignDefs[0];
+ if(camp.id==='cafeteria' || !camp.bg) drawTileFloorForGame(camp); else { safeDraw(camp.bg,0,0,W,H); ctx.fillStyle='rgba(255,242,205,.30)'; ctx.fillRect(0,76,W,H-76); drawTileFloorForGame(camp); }
+ drawCafeteriaDecor(); drawTopHud(camp);
+ const side=ctx.createLinearGradient(0,76,96,76); side.addColorStop(0,'#7a351d'); side.addColorStop(.20,'#48150d'); side.addColorStop(.24,'#0f5a70'); side.addColorStop(1,'#052333'); ctx.fillStyle=side; ctx.fillRect(0,0,100,H);
+ ctx.strokeStyle='#34100d'; ctx.lineWidth=5; ctx.strokeRect(0,0,100,H); ctx.strokeStyle='rgba(255,232,165,.18)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(96,2); ctx.lineTo(96,H); ctx.stroke();
+ // redraw top objects after side strip, like the screenshot layered cards
+ drawTopHud(camp);
+ const seedCards = game.minigame==='conveyor' ? game.conveyor : game.chosen;
+ for(let i=0;i<seedCards.length;i++){ const base=seedCards[i], w=foodStats(base); if(w) drawSeedCard(w,i); }
+ // shovel card at bottom left
+ ctx.save(); ctx.fillStyle=game.shovel?'#f0d665':'#244a5e'; roundRect(10,590,82,40,8); ctx.fill(); ctx.strokeStyle='#061f2b'; ctx.lineWidth=3; ctx.stroke(); safeDraw('shovel.png',13,586,44,44); drawText('DIG',60,601,14,game.shovel?'#3a211a':'#e7f7ff','left',false); ctx.restore();
+ drawLeftLunchThrowers();
+ if(game.minigame==='bowling') drawText('Click a lane tile to bowl.',118,602,15,'#fff0bf');
+ if(game.minigame==='conveyor') drawText('Pick a conveyor card, then plant.',118,602,15,'#fff0bf');
+ // hover cell
+ if(hovered){ const c=Math.floor((hovered.x-grid.x)/grid.cw), r=Math.floor((hovered.y-grid.y)/grid.ch); if(r>=0&&r<grid.rows&&c>=0&&c<grid.cols){ ctx.fillStyle='rgba(77,255,76,.20)'; ctx.fillRect(grid.x+c*grid.cw,grid.y+r*grid.ch,grid.cw,grid.ch); ctx.strokeStyle='rgba(255,246,118,.60)'; ctx.lineWidth=3; ctx.strokeRect(grid.x+c*grid.cw+2,grid.y+r*grid.ch+2,grid.cw-4,grid.ch-4); } }
+ // plants and shots
+ game.plants.slice().sort((a,b)=>a.row-b.row || a.col-b.col).forEach(p=>{ const w=byId(p.id), x=colX(p.col), y=rowY(p.row); ctx.fillStyle='rgba(0,0,0,.20)'; ctx.beginPath(); ctx.ellipse(x,y+34,38,12,0,0,Math.PI*2); ctx.fill(); safeDraw(w.img,x-43,y-60,86,86); if(p.hp<p.maxHp){ ctx.fillStyle='rgba(0,0,0,.36)'; roundRect(x-30,y+36,60,7,3); ctx.fill(); ctx.fillStyle='#55dd50'; roundRect(x-30,y+36,60*clamp(p.hp/p.maxHp,0,1),7,3); ctx.fill(); }});
+ for(const pr of game.projectiles){ const bob=pr.lob?Math.sin(pr.age*8)*9:0; ctx.save(); if(pr.bowling){ ctx.translate(pr.x,pr.y+bob); ctx.rotate(pr.age*7); safeDraw(pr.shot,-32,-32,64,64); } else if(pr.shot==='pizza_slice.png') { ctx.translate(pr.x,pr.y+bob); ctx.rotate(pr.age*8); safeDraw(pr.shot,-19,-19,38,38); } else safeDraw(pr.shot,pr.x-17,pr.y-17+bob,34,34); ctx.restore(); }
+ game.enemies.slice().sort((a,b)=>a.row-b.row || a.x-b.x).forEach(e=>{ const d=enemyDefs[e.type]||enemyDefs.geek, y=rowY(e.row)+10+Math.sin(e.frame*7)*2; ctx.fillStyle='rgba(0,0,0,.24)'; ctx.beginPath(); ctx.ellipse(e.x,y+38,38,12,0,0,Math.PI*2); ctx.fill(); if(e.slow>0||e.freeze>0) drawSplat(e.x,y-18,e.freeze>0?'#8ee9ff':'#22b844',1.1,.36); if(e.burn>0) drawSplat(e.x,y-15,'#ff6c2b',.92,.28); safeDraw(d.img,e.x-47,y-82,94,118); ctx.fillStyle='rgba(0,0,0,.38)'; roundRect(e.x-34,y+41,68,7,3); ctx.fill(); ctx.fillStyle=e.freeze>0?'#a8edff':e.slow>0?'#ff7bdc':'#ff4a38'; roundRect(e.x-34,y+41,68*clamp(e.hp/e.maxHp,0,1),7,3); ctx.fill(); if(e.shieldHits>0) drawText('TRAY',e.x,y-83,10,'#e8f2ff','center'); });
+ for(const c of game.coins){ ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(c.x,c.y+16,19,7,0,0,Math.PI*2); ctx.fill(); safeDraw('lunch_money.png',c.x-20,c.y-20,40,40); }
+ for(const p of game.particles){ ctx.globalAlpha=clamp(p.life,0,1); drawText(p.text,p.x,p.y,17,p.color,'center'); ctx.globalAlpha=1; }
+ if(game.dark>0){ ctx.fillStyle='rgba(0,0,0,'+(0.18+Math.min(.28,game.dark*.08))+')'; ctx.fillRect(grid.x,grid.y,grid.cw*grid.cols,grid.ch*grid.rows); }
+ if(game.ready>0){ ctx.fillStyle='rgba(0,0,0,.22)'; ctx.fillRect(0,0,W,H); drawText(game.message,W/2,H/2-35,66,'#fff7c8','center'); }
+ if(game.win||game.lose){ ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(0,0,W,H); drawPanel(298,226,364,196, game.win?'#386c32':'#783229'); drawText(game.win?'LUNCH SAVED!':'CAFETERIA OVERRUN',480,258,32,'#fff4c8','center'); drawText(game.win?`${game.minigame?(game.minigameName||'Minigame'):(camp.short+' level '+game.level)} complete. Enemies sauced: ${game.killed}`:'The hungry humans got through.',480,304,17,'#fff0c8','center'); if(game.win) drawText(`Bank bonus +$${game.winBonus}   Bank $${Math.floor(bankCoins)}`,480,330,16,'#fff06a','center'); drawButton({label:game.minigame?'MINIGAMES':'LEVEL SELECT',x:360,y:365,w:240,h:50,fn:()=>{},opts:{size:22}}); }
+ ctx.restore();
+}
+function weaponSelect(){
+ resetButtons(); const camp=currentCampaignDef(); drawReferenceFloor(); drawRightSnackers();
+ const chosenList=chosenIds.map(byId).filter(Boolean);
+ for(let i=0;i<6;i++){ const w=chosenList[i]; const y=42+i*74; drawCardFrame(7,y,88,66,w,false); if(w){ safeDraw(w.img,14,y+6,52,52); drawCostBadge(foodStats(w).cost,53,y+42,34,16); } }
+ drawPanel(124,30,666,506,'#8b3320','#42120d'); drawText('CHOOSE YOUR WEAPONS',457,40,26,'#fff4c8','center'); drawText(`${camp.short} - Level ${selectedLevel}`,457,74,15,'#ffe7a6','center',false);
+ const list=weaponDefs.filter(w=>!w.campaign || w.campaign===camp.id); chosenIds=chosenIds.filter(id=>list.some(w=>w.id===id && w.unlock<=selectedLevel)).slice(0,6);
+ const sx=150, sy=96, cw=108, ch=58, gapX=122, gapY=65;
+ list.slice(0,30).forEach((w,i)=>{ const x=sx+(i%5)*gapX, y=sy+Math.floor(i/5)*gapY; const lock=w.unlock>selectedLevel; drawBlueTopCard(x,y,cw,ch,w.img,w.name,foodStats(w).cost,chosenIds.includes(w.id),lock); if(!lock) addButton('',x,y,cw,ch,()=>toggleWeapon(w.id),{blank:true}); });
+ ctx.save(); ctx.fillStyle='rgba(70,17,12,.42)'; roundRect(181,552,368,24,9); ctx.fill(); ctx.restore(); drawText(`${chosenIds.length}/6 selected   Bank $${Math.floor(bankCoins)}`,365,555,14,'#fff0bf','center',false);
+ addButton('QUIT',56,578,122,44,()=>setState('levels'),{size:22}); addButton('START FIGHT',344,578,198,44,()=>{ if(chosenIds.length===0) chosenIds=['mint','jello']; startLoading(); },{size:21}); buttons.forEach(b=>{ if(!b.opts.blank) drawButton(b); });
+}
+function enemydex(){
+ resetButtons(); drawReferenceFloor();
+ const entries=Object.entries(enemyDefs); const per=20,total=Math.ceil(entries.length/per); enemyPage=clamp(enemyPage,0,total-1); const list=entries.slice(enemyPage*per,enemyPage*per+per); if(!enemyDefs[selectedEnemyId] || !list.some(([id])=>id===selectedEnemyId)) selectedEnemyId=list[0] ? list[0][0] : 'geek';
+ drawPanel(18,14,918,548,'#8b3320','#42120d'); drawText('ENEMIES',271,25,25,'#fff4c8','center');
+ const sx=42, sy=58, cw=88, ch=66, gapX=104, gapY=74; list.forEach(([id,e],i)=>{ const x=sx+(i%4)*gapX, y=sy+Math.floor(i/4)*gapY; drawBlueTopCard(x,y,cw,ch,e.img,'',null,selectedEnemyId===id,false); addButton('',x,y,cw,ch,()=>{ selectedEnemyId=id; setState('enemydex'); },{blank:true}); });
+ ctx.save(); ctx.fillStyle='rgba(17,31,29,.97)'; roundRect(533,51,350,205,4); ctx.fill(); ctx.strokeStyle='#33120e'; ctx.lineWidth=5; ctx.stroke(); const light=ctx.createRadialGradient(706,168,12,706,168,230); light.addColorStop(0,'rgba(255,248,214,.72)'); light.addColorStop(.34,'rgba(247,230,183,.28)'); light.addColorStop(1,'rgba(0,0,0,.04)'); ctx.fillStyle=light; ctx.beginPath(); ctx.ellipse(706,176,155,52,0,0,Math.PI*2); ctx.fill(); const previewEnemy=enemyDefs[selectedEnemyId]||enemyDefs.geek; ctx.fillStyle='rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(708,224,54,13,0,0,Math.PI*2); ctx.fill(); safeDraw(previewEnemy.img,652,74,112,158); ctx.restore();
+ const ed=enemyDefs[selectedEnemyId]||enemyDefs.geek; drawText('Name: '+ed.name,535,276,21,'#fff5cf','left'); drawText('Attack: Eater',535,307,19,'#fff5cf','left'); drawText('Strength: '+(ed.hp<120?'Low':ed.hp<190?'Medium':'High'),535,336,19,'#fff5cf','left'); const desc=ed.desc || 'He does not just have an appetite for knowledge, but also for food...'; const words=('He does not just have an appetite for knowledge, but also for food... '+desc).split(' '); let line='', yy=380; words.forEach(word=>{ const test=line?line+' '+word:word; if(test.length>38){ drawText(line,535,yy,16,'#fff0c8','left'); yy+=24; line=word; } else line=test; }); if(line) drawText(line,535,yy,16,'#fff0c8','left');
+ if(enemyPage>0) addButton('‹',25,530,58,42,()=>{enemyPage--; selectedEnemyId=(Object.keys(enemyDefs)[enemyPage*per])||'geek'; setState('enemydex');},{size:28}); if(enemyPage<total-1) addButton('›',398,530,58,42,()=>{enemyPage++; selectedEnemyId=(Object.keys(enemyDefs)[enemyPage*per])||'geek'; setState('enemydex');},{size:28}); addButton('BACK',31,578,112,42,()=>setState('menu'),{size:22}); drawText(`Page ${enemyPage+1}/${total}`,250,587,16,'#fff0bf','center',false); buttons.forEach(b=>{ if(!b.opts.blank) drawButton(b); });
+}
+function loading(){
+ drawReferenceFloor(); safeDraw('title_foodfight.png',45,28,390,210);
+ ctx.save(); ctx.fillStyle='rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(420,506,235,34,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#8d4a20'; roundRect(306,390,260,70,12); ctx.fill(); ctx.strokeStyle='#34160c'; ctx.lineWidth=5; ctx.stroke(); ctx.fillStyle='#663018'; ctx.fillRect(335,454,25,90); ctx.fillRect(515,454,25,90);
+ safeDraw('jello_shot.png',214,316,168,168); safeDraw('spaghetti_tangle.png',352,330,118,118); safeDraw('burger_bunker.png',438,332,108,108); safeDraw('pizza_disc.png',288,340,96,96);
+ [['jock',657,290],['geek',570,330],['bomb',760,335],['cheer',842,405]].forEach(([id,x,y])=>{ const e=enemyDefs[id]||enemyDefs.geek; ctx.fillStyle='rgba(0,0,0,.20)'; ctx.beginPath(); ctx.ellipse(x,y+88,54,15,0,0,Math.PI*2); ctx.fill(); safeDraw(e.img,x-61,y-90,122,184); });
+ ctx.restore(); drawText('Loading...',804,558,25,'#1d1610','center'); loadingSpin+=.08; ctx.save(); ctx.translate(873,581); ctx.rotate(loadingSpin); safeDraw('spinner.png',-18,-18,36,36); ctx.restore(); if(loaded>=assetNames.length && state==='loading' && !game){ setTimeout(()=>{ if(state==='loading'&&!game) setState('menu'); }, 250); }
+}
+
 function loop(now){ const dt=(now-last)/1000; last=now; ctx.clearRect(0,0,W,H); update(dt);
  if(state==='loading') loading(); else if(state==='menu') menu(); else if(state==='campaigns') campaigns(); else if(state==='minigames') minigames(); else if(state==='levels') levels(); else if(state==='weapons') weaponSelect(); else if(state==='fooddex') fooddex(); else if(state==='enemydex') enemydex(); else if(state==='upgrades') upgrades(); else if(state==='synergies') synergies(); else if(state==='help') help(); else if(state==='options') options(); else if(state==='play') drawGame();
  requestAnimationFrame(loop);
