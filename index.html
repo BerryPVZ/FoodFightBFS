@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 <title>Food Fight: Back for Seconds</title>
 <style>
-  html, body { margin:0; height:100%; overflow:hidden; background:#041018; font-family:"Trebuchet MS", "Comic Sans MS", "Arial Rounded MT Bold", system-ui, sans-serif; }
-  #wrap { height:100%; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at center,#0e4c63 0,#062636 42%,#041018 90%); }
-  canvas { width:min(100vw, 150vh); height:min(66.667vw, 100vh); image-rendering:auto; touch-action:none; box-shadow:0 0 0 5px #04131a, 0 0 0 11px #0b4153, 0 18px 70px #000d; background:#0d2730; }
+  html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#041018; font-family:"Trebuchet MS", "Comic Sans MS", "Arial Rounded MT Bold", system-ui, sans-serif; }
+  #wrap { width:100%; height:100vh; height:100dvh; box-sizing:border-box; padding:16px 16px 20px; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at center,#0e4c63 0,#062636 42%,#041018 90%); }
+  canvas { display:block; width:min(calc(100vw - 32px), calc((100vh - 36px) * 1.5)); width:min(calc(100vw - 32px), calc((100dvh - 36px) * 1.5)); height:auto; max-height:calc(100vh - 36px); max-height:calc(100dvh - 36px); aspect-ratio:3 / 2; image-rendering:auto; touch-action:none; box-sizing:border-box; box-shadow:0 0 0 5px #04131a, 0 0 0 11px #0b4153, 0 18px 70px #000d; background:#0d2730; }
   #hint { display:none; }
 </style>
 </head>
@@ -22,6 +22,11 @@ const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = true;
 
 const W=960,H=640;
+// Keep the top HUD/card strip away from the physical canvas edge. Some 4:3 screens
+// and browser zoom levels clip the canvas border/shadow, which used to make the
+// coin counter and first card look shoved upward or partly offscreen.
+const HUD_TOP=12;
+const SEED_TOP=14;
 const grid = { x:104, y:88, cols:9, rows:5, cw:84, ch:100 };
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const rnd=(a,b)=>a+Math.random()*(b-a);
@@ -834,14 +839,14 @@ function dropMoney(x,y,amount){ amount=50; game.coins.push({x,y,amount,life:8,vy
 function plantAt(row,col){ return game.plants.find(p=>p.row===row&&p.col===col); }
 function addPlant(w,row,col){ w=foodStats(w); const camp=campaignDefs[game.campaign] || campaignDefs[0]; let hp=w.hp||200; if(camp.id==='thanksgiving' && w.role==='wall') hp*=1.2; game.plants.push({id:w.id,row,col,hp,maxHp:hp,last:0,money:0,anim:0}); if(game.minigame!=='conveyor') game.money-=w.cost; let cool=w.cool||5; if(camp.id==='mall' && w.effect==='stun') cool*=.82; if(game.minigame!=='conveyor') game.cooldowns[w.id]=cool; sfx('sfx_plant.mp3',.7); }
 function gameClick(p){
- if(game.win||game.lose){ if(p.x>360&&p.x<600&&p.y>300&&p.y<355){ setState(game.minigame?'minigames':'levels'); playMusic('menu'); } return; }
- if(p.x>=640&&p.x<=792&&p.y>=24&&p.y<=62){ useSpecialSauce(); return; }
- if(p.x>800 && p.y<66){ setState('menu'); playMusic('menu'); return; }
+ if(game.win||game.lose){ if(p.x>=360&&p.x<=600&&p.y>=365&&p.y<=415){ setState(game.minigame?'minigames':'levels'); playMusic('menu'); } return; }
+ if(p.x>=638&&p.x<=792&&p.y>=HUD_TOP+29&&p.y<=HUD_TOP+62){ useSpecialSauce(); return; }
+ if(p.x>=816&&p.x<=940&&p.y>=HUD_TOP+5&&p.y<=HUD_TOP+55){ setState('menu'); playMusic('menu'); return; }
  // collect coins first
  for(let i=game.coins.length-1;i>=0;i--){ const c=game.coins[i]; if(Math.hypot(p.x-c.x,p.y-c.y)<34){ game.money+=c.amount; game.bankEarned=(game.bankEarned||0)+c.amount; awardBank(c.amount); addParticle(c.x,c.y,'+$'+c.amount,'#fff06a'); game.coins.splice(i,1); sfx('sfx_coin.mp3',.9); return; } }
  // seedbank / conveyor
  const cardList = game.minigame==='conveyor' ? game.conveyor : game.chosen;
- for(let i=0;i<cardList.length;i++){ const y=6+i*84; if(p.x>=7&&p.x<=95&&p.y>=y&&p.y<=y+76){ const w=cardList[i]; const sw=foodStats(w); if(game.minigame==='conveyor'){ game.selected=w.id; game.conveyor.splice(i,1); game.shovel=false; sfx('sfx_click.mp3'); return; }
+ for(let i=0;i<cardList.length;i++){ const y=SEED_TOP+i*84; if(p.x>=7&&p.x<=95&&p.y>=y&&p.y<=y+76){ const w=cardList[i]; const sw=foodStats(w); if(game.minigame==='conveyor'){ game.selected=w.id; game.conveyor.splice(i,1); game.shovel=false; sfx('sfx_click.mp3'); return; }
      if(game.cooldowns[w.id]<=0 && game.money>=sw.cost){ game.selected=w.id; game.shovel=false; } else { addParticle(100,y+30, game.money<sw.cost?'Need money':'Cooling','#ffdf74'); } return; } }
  // shovel
  if(p.x>=10&&p.x<=92&&p.y>=590&&p.y<=630){ game.shovel=!game.shovel; game.selected=null; sfx('sfx_click.mp3'); return; }
@@ -1097,17 +1102,24 @@ function loading(){
    Screenshot-style UI patch: every screen is still drawn in code on canvas.
    The coordinates are based on the 480x320 reference shots, scaled 2x.
 ------------------------------------------------------------------------- */
+function stableJitter(x,y,w,h,i,amp){
+ const n=Math.sin(x*12.9898 + y*78.233 + w*37.719 + h*11.137 + i*91.17)*43758.5453;
+ return ((n-Math.floor(n))*2-1)*amp;
+}
 function ffJitterPathRect(x,y,w,h,r=10,amp=3){
+ // Deterministic sketch wobble. The older version called Math.random() every
+ // frame, so panel edges and their dark shadows shimmered/flickered constantly.
+ const j=i=>stableJitter(x,y,w,h,i,amp);
  ctx.beginPath();
- ctx.moveTo(x+r,y+rnd(-amp,amp));
- ctx.lineTo(x+w-r+rnd(-amp,amp),y+rnd(-amp,amp));
- ctx.quadraticCurveTo(x+w+rnd(-amp,amp),y+rnd(-amp,amp),x+w+rnd(-amp,amp),y+r+rnd(-amp,amp));
- ctx.lineTo(x+w+rnd(-amp,amp),y+h-r+rnd(-amp,amp));
- ctx.quadraticCurveTo(x+w+rnd(-amp,amp),y+h+rnd(-amp,amp),x+w-r+rnd(-amp,amp),y+h+rnd(-amp,amp));
- ctx.lineTo(x+r+rnd(-amp,amp),y+h+rnd(-amp,amp));
- ctx.quadraticCurveTo(x+rnd(-amp,amp),y+h+rnd(-amp,amp),x+rnd(-amp,amp),y+h-r+rnd(-amp,amp));
- ctx.lineTo(x+rnd(-amp,amp),y+r+rnd(-amp,amp));
- ctx.quadraticCurveTo(x+rnd(-amp,amp),y+rnd(-amp,amp),x+r+rnd(-amp,amp),y+rnd(-amp,amp));
+ ctx.moveTo(x+r,y+j(0));
+ ctx.lineTo(x+w-r+j(1),y+j(2));
+ ctx.quadraticCurveTo(x+w+j(3),y+j(4),x+w+j(5),y+r+j(6));
+ ctx.lineTo(x+w+j(7),y+h-r+j(8));
+ ctx.quadraticCurveTo(x+w+j(9),y+h+j(10),x+w-r+j(11),y+h+j(12));
+ ctx.lineTo(x+r+j(13),y+h+j(14));
+ ctx.quadraticCurveTo(x+j(15),y+h+j(16),x+j(17),y+h-r+j(18));
+ ctx.lineTo(x+j(19),y+r+j(20));
+ ctx.quadraticCurveTo(x+j(21),y+j(22),x+r+j(23),y+j(24));
  ctx.closePath();
 }
 function ffBrushBlob(x,y,w,h,fill,alpha=.14){
@@ -1181,22 +1193,22 @@ function drawCostBadge(amount,x,y,w=50,h=19){
 }
 function drawTopHud(camp){
  ctx.save();
- const bar=ctx.createLinearGradient(0,0,0,78); bar.addColorStop(0,'#b24f24'); bar.addColorStop(.2,'#822b17'); bar.addColorStop(.76,'#4e1710'); bar.addColorStop(1,'#6f2919'); ctx.fillStyle=bar; ctx.fillRect(0,0,W,76);
- ctx.fillStyle='rgba(255,214,120,.14)'; ctx.fillRect(0,5,W,7); ctx.fillStyle='rgba(0,0,0,.48)'; ctx.fillRect(0,74,W,7);
- // money tray exactly where the top of the reference screen keeps it
- drawPanel(106,4,124,44,'#1c8f3d','#062c16'); safeDraw('lunch_money.png',112,8,34,34); drawText(String(Math.floor(game.money)).padStart(4,'0'),177,12,25,'#ffe85d','center');
- drawPanel(238,5,84,42,game.shovel?'#d7af3c':'#17445f','#0b2737'); safeDraw('shovel.png',244,5,36,36); drawText(game.shovel?'ON':'DIG',294,16,13,'#e8fbff','center',false);
- ctx.fillStyle='rgba(0,0,0,.30)'; roundRect(438,6,286,36,18); ctx.fill();
- ctx.fillStyle='#f3d08f'; roundRect(446,11,270,22,12); ctx.fill(); ctx.fillStyle='#9a4823'; roundRect(451,19,260,8,4); ctx.fill(); ctx.fillStyle='#61a735'; roundRect(451,26,260,7,4); ctx.fill(); ctx.fillStyle='#ffd94d'; ctx.fillRect(446,15,270,3);
- const prog=game.wave.length?clamp(game.spawned/game.wave.length,0,1):0; ctx.fillStyle='#fff4a2'; roundRect(451,13,260*prog,12,7); ctx.fill();
- ctx.fillStyle='#c63c2b'; [507,674].forEach(x=>{ctx.beginPath(); ctx.arc(x,7,6,0,Math.PI*2); ctx.fill();});
- drawText(game.minigame?(game.minigameShort||game.minigameName):camp.short+' '+game.level,584,42,14,'#fff4ce','center');
- drawPanel(638,29,154,33,game.sauce>=100?'#946324':'#5a211d','#2b0d0c'); ctx.fillStyle='#35100d'; roundRect(652,40,126,11,6); ctx.fill(); ctx.fillStyle=game.sauce>=100?'#fff25c':'#e75727'; roundRect(652,40,126*clamp((game.sauce||0)/100,0,1),11,6); ctx.fill(); drawText(game.sauce>=100?'SAUCE!':'SAUCE',714,31,14,'#fff6d2','center');
- drawPanel(816,5,124,50,'#8e3d21','#421410'); drawText('MENU',878,15,26,'#fff2cf','center');
+ const y0=HUD_TOP;
+ const bar=ctx.createLinearGradient(0,y0,0,y0+78); bar.addColorStop(0,'#b24f24'); bar.addColorStop(.2,'#822b17'); bar.addColorStop(.76,'#4e1710'); bar.addColorStop(1,'#6f2919'); ctx.fillStyle=bar; ctx.fillRect(0,y0,W,76);
+ ctx.fillStyle='rgba(255,214,120,.14)'; ctx.fillRect(0,y0+5,W,7); ctx.fillStyle='rgba(0,0,0,.48)'; ctx.fillRect(0,y0+74,W,7);
+ drawPanel(106,y0+4,124,44,'#1c8f3d','#062c16'); safeDraw('lunch_money.png',112,y0+8,34,34); drawText(String(Math.floor(game.money)).padStart(4,'0'),177,y0+12,25,'#ffe85d','center');
+ drawPanel(238,y0+5,84,42,game.shovel?'#d7af3c':'#17445f','#0b2737'); safeDraw('shovel.png',244,y0+5,36,36); drawText(game.shovel?'ON':'DIG',294,y0+16,13,'#e8fbff','center',false);
+ ctx.fillStyle='rgba(0,0,0,.30)'; roundRect(438,y0+6,286,36,18); ctx.fill();
+ ctx.fillStyle='#f3d08f'; roundRect(446,y0+11,270,22,12); ctx.fill(); ctx.fillStyle='#9a4823'; roundRect(451,y0+19,260,8,4); ctx.fill(); ctx.fillStyle='#61a735'; roundRect(451,y0+26,260,7,4); ctx.fill(); ctx.fillStyle='#ffd94d'; ctx.fillRect(446,y0+15,270,3);
+ const prog=game.wave.length?clamp(game.spawned/game.wave.length,0,1):0; ctx.fillStyle='#fff4a2'; roundRect(451,y0+13,260*prog,12,7); ctx.fill();
+ ctx.fillStyle='#c63c2b'; [507,674].forEach(x=>{ctx.beginPath(); ctx.arc(x,y0+7,6,0,Math.PI*2); ctx.fill();});
+ drawText(game.minigame?(game.minigameShort||game.minigameName):camp.short+' '+game.level,584,y0+42,14,'#fff4ce','center');
+ drawPanel(638,y0+29,154,33,game.sauce>=100?'#946324':'#5a211d','#2b0d0c'); ctx.fillStyle='#35100d'; roundRect(652,y0+40,126,11,6); ctx.fill(); ctx.fillStyle=game.sauce>=100?'#fff25c':'#e75727'; roundRect(652,y0+40,126*clamp((game.sauce||0)/100,0,1),11,6); ctx.fill(); drawText(game.sauce>=100?'SAUCE!':'SAUCE',714,y0+31,14,'#fff6d2','center');
+ drawPanel(816,y0+5,124,50,'#8e3d21','#421410'); drawText('MENU',878,y0+15,26,'#fff2cf','center');
  ctx.restore();
 }
 function drawSeedCard(w,i){
- const y=6+i*84, selected=game.selected===w.id, cool=game.minigame==='conveyor'?0:clamp(game.cooldowns[w.id]/(w.cool||5),0,1), locked=!game.minigame&&game.money<w.cost;
+ const y=SEED_TOP+i*84, selected=game.selected===w.id, cool=game.minigame==='conveyor'?0:clamp(game.cooldowns[w.id]/(w.cool||5),0,1), locked=!game.minigame&&game.money<w.cost;
  ctx.save(); drawCardFrame(7,y,88,76,selected,locked); safeDraw(w.img,13,y+7,58,58); drawCostBadge(game.minigame==='conveyor'?'FREE':w.cost,51,y+49,36,17); drawText(game.minigame==='conveyor'?'BELT':'Lv'+upgradeLevel(w.id),67,y+65,9,'#fff8c4','center');
  if(cool>0||locked){ ctx.fillStyle='rgba(8,19,25,.62)'; roundRect(7,y,88,76*(cool||1),9); ctx.fill(); if(locked) drawText('$',51,y+23,29,'#ffeb6a','center'); }
  ctx.restore();
@@ -1238,7 +1250,7 @@ function drawGame(){
  // plants and shots
  game.plants.slice().sort((a,b)=>a.row-b.row || a.col-b.col).forEach(p=>{ const w=byId(p.id), x=colX(p.col), y=rowY(p.row); ctx.fillStyle='rgba(0,0,0,.20)'; ctx.beginPath(); ctx.ellipse(x,y+34,38,12,0,0,Math.PI*2); ctx.fill(); safeDraw(w.img,x-43,y-60,86,86); if(p.hp<p.maxHp){ ctx.fillStyle='rgba(0,0,0,.36)'; roundRect(x-30,y+36,60,7,3); ctx.fill(); ctx.fillStyle='#55dd50'; roundRect(x-30,y+36,60*clamp(p.hp/p.maxHp,0,1),7,3); ctx.fill(); }});
  for(const pr of game.projectiles){ const bob=pr.lob?Math.sin(pr.age*8)*9:0; ctx.save(); if(pr.bowling){ ctx.translate(pr.x,pr.y+bob); ctx.rotate(pr.age*7); safeDraw(pr.shot,-32,-32,64,64); } else if(pr.shot==='pizza_slice.png') { ctx.translate(pr.x,pr.y+bob); ctx.rotate(pr.age*8); safeDraw(pr.shot,-19,-19,38,38); } else safeDraw(pr.shot,pr.x-17,pr.y-17+bob,34,34); ctx.restore(); }
- game.enemies.slice().sort((a,b)=>a.row-b.row || a.x-b.x).forEach(e=>{ const d=enemyDefs[e.type]||enemyDefs.geek, y=rowY(e.row)+10+Math.sin(e.frame*7)*2; ctx.fillStyle='rgba(0,0,0,.24)'; ctx.beginPath(); ctx.ellipse(e.x,y+38,38,12,0,0,Math.PI*2); ctx.fill(); if(e.slow>0||e.freeze>0) drawSplat(e.x,y-18,e.freeze>0?'#8ee9ff':'#22b844',1.1,.36); if(e.burn>0) drawSplat(e.x,y-15,'#ff6c2b',.92,.28); safeDraw(d.img,e.x-47,y-82,94,118); ctx.fillStyle='rgba(0,0,0,.38)'; roundRect(e.x-34,y+41,68,7,3); ctx.fill(); ctx.fillStyle=e.freeze>0?'#a8edff':e.slow>0?'#ff7bdc':'#ff4a38'; roundRect(e.x-34,y+41,68*clamp(e.hp/e.maxHp,0,1),7,3); ctx.fill(); if(e.shieldHits>0) drawText('TRAY',e.x,y-83,10,'#e8f2ff','center'); });
+ game.enemies.slice().sort((a,b)=>a.row-b.row || a.x-b.x).forEach(e=>{ const d=enemyDefs[e.type]||enemyDefs.geek, groundY=rowY(e.row)+10, y=groundY+Math.sin(e.frame*7)*2; ctx.fillStyle='rgba(0,0,0,.24)'; ctx.beginPath(); ctx.ellipse(e.x,groundY+38,38,12,0,0,Math.PI*2); ctx.fill(); if(e.slow>0||e.freeze>0) drawSplat(e.x,y-18,e.freeze>0?'#8ee9ff':'#22b844',1.1,.36); if(e.burn>0) drawSplat(e.x,y-15,'#ff6c2b',.92,.28); safeDraw(d.img,e.x-47,y-82,94,118); ctx.fillStyle='rgba(0,0,0,.38)'; roundRect(e.x-34,groundY+41,68,7,3); ctx.fill(); ctx.fillStyle=e.freeze>0?'#a8edff':e.slow>0?'#ff7bdc':'#ff4a38'; roundRect(e.x-34,groundY+41,68*clamp(e.hp/e.maxHp,0,1),7,3); ctx.fill(); if(e.shieldHits>0) drawText('TRAY',e.x,y-83,10,'#e8f2ff','center'); });
  for(const c of game.coins){ ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(c.x,c.y+16,19,7,0,0,Math.PI*2); ctx.fill(); safeDraw('lunch_money.png',c.x-20,c.y-20,40,40); }
  for(const p of game.particles){ ctx.globalAlpha=clamp(p.life,0,1); drawText(p.text,p.x,p.y,17,p.color,'center'); ctx.globalAlpha=1; }
  if(game.dark>0){ ctx.fillStyle='rgba(0,0,0,'+(0.18+Math.min(.28,game.dark*.08))+')'; ctx.fillRect(grid.x,grid.y,grid.cw*grid.cols,grid.ch*grid.rows); }
